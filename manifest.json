@@ -1,23 +1,21 @@
 {
-"manifest_version": 3,
-"name": "ClassBoost - Meet Overlay (Starter)",
-"version": "0.1",
-"description": "Injects a small overlay into Google Meet for hackathon features.",
-"permissions": ["storage", "scripting", "activeTab", "identity", "notifications"],
-"host_permissions": ["https://your-backend.example/*"],
-"background": {
-"service_worker": "background.js"
-},
-"content_scripts": [
-{
-"matches": ["https://meet.google.com/*"],
-"js": ["content.js"],
-"css": ["overlay.css"]
-}
-],
-"action": {
-"default_title": "ClassBoost"
-},
-"options_page": "options.html",
-"web_accessible_resources": [{"resources": ["overlay.css"], "matches": ["https://meet.google.com/*"]}]
+  "manifest_version": 3,
+  "name": "ClassBoost - Meet Overlay (Starter)",
+  "version": "0.1",
+  "description": "Injects a small overlay into Google Meet for hackathon features.",
+  "permissions": ["storage", "scripting", "activeTab", "identity", "notifications"],
+  "host_permissions": ["http://localhost:3000/*"], 
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content.js"],
+      "css": ["overlay.css"]
+    }
+  ],
+  "action": {
+    "default_title": "ClassBoost"
+  }
 }

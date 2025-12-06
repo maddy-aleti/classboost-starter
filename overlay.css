@@ -1,15 +1,29 @@
 /* overlay.css */
-#classboost-overlay { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; font-family: Arial, Helvetica, sans-serif; }
-
+#classboost-overlay { 
+  position: fixed; 
+  top: 20px; 
+  right: 16px; 
+  z-index: 2147483647; 
+  font-family: Arial, Helvetica, sans-serif; 
+  touch-action: none;
+}
 
 .cb-card {
-width: 170px;
-background: rgba(20,20,20,0.95);
-color: #f3e9d2;
-border: 1px solid rgba(255,215,0,0.12);
-box-shadow: 0 6px 18px rgba(0,0,0,0.6);
-border-radius: 8px;
-padding: 8px;
+  width: 170px;
+  background: rgba(20,20,20,0.95);
+  color: #f3e9d2;
+  border: 1px solid rgba(255,215,0,0.12);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cb-card.dragging { 
+  cursor: grabbing; 
+  opacity: 0.95; 
+  transition: none; 
 }
 .cb-header { font-weight: 700; margin-bottom: 6px; }
 .cb-body { margin-bottom: 6px; }
@@ -122,3 +136,19 @@ padding: 8px;
 }
 
 /* Modal already exists; keep your version */
+
+/* Speedometer modal */
+#cb-speedometer-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); z-index: 2147483648; }
+.cb-speedometer-card { background: #0b0b0c; color: #f3e9d2; padding: 18px; border-radius: 10px; width: 420px; max-width: 92%; box-shadow: 0 12px 36px rgba(0,0,0,0.7); text-align: center; }
+.cb-speedometer-title { font-weight: 700; margin-bottom: 8px; }
+.cb-speedometer-svg { width: 100%; height: auto; display:block; }
+.cb-speedometer-legend { margin-top: 8px; font-size: 13px; }
+
+/* needle */
+.cb-needle { transform-origin: 50% 85%; transition: transform 400ms cubic-bezier(.2,.9,.2,1); }
+
+/* Alert banner shown inside the modal or as a fixed small banner */
+.cb-alert-banner { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #e74c3c; color: white; padding: 8px 14px; border-radius: 20px; z-index: 2147483649; box-shadow: 0 6px 18px rgba(231,76,60,0.3); display: none; }
+.cb-alert-banner.show { display: block; }
+
+
