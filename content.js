@@ -1,23 +1,22 @@
 // content.js
-(function() {
-const OVERLAY_ID = 'classboost-overlay';
-let isDragging = false;
-let offset = { x: 0, y: 0 };
-let classScoreIntervalId = null;
+(function () {
+  const OVERLAY_ID = "classboost-overlay";
+  let isDragging = false;
+  let offset = { x: 0, y: 0 };
+  let classScoreIntervalId = null;
 
+  function createOverlay() {
+    if (document.getElementById(OVERLAY_ID)) return;
 
-function createOverlay() {
-if (document.getElementById(OVERLAY_ID)) return;
-
-
-const container = document.createElement('div');
-container.id = OVERLAY_ID;
-container.innerHTML =`<div class="cb-card">
+    const container = document.createElement("div");
+    container.id = OVERLAY_ID;
+    container.innerHTML = `<div class="cb-card">
   <div class="cb-header">ClassBoost — Teacher Panel</div>
 
   <div class="cb-body">
     <!-- Buttons (primary actions) -->
     <button id="cb-show-engagement" class="cb-btn">Engagement Meter</button>
+    <button id="cb-pair-participants" class="cb-btn">Pair & Post Chat Links</button>
     <button id="cb-match-trigger" class="cb-btn">Match Students & Quiz</button>
     <button id="cb-gen-gif" class="cb-btn">Generate GIF</button>
     <button id="cb-gen-flashcard" class="cb-btn">Generate Flashcard</button>
@@ -71,335 +70,696 @@ container.innerHTML =`<div class="cb-card">
       <button id="cb-topic-cancel" class="cb-btn-secondary" style="flex:1;">Cancel</button>
     </div>
   </div>
-</div>`
+</div>`;
 
+    document.body.appendChild(container);
 
-
-document.body.appendChild(container);
-
-  // Engagement Meter button opens speedometer modal
-  document.getElementById('cb-show-engagement').addEventListener('click', () => {
-    document.getElementById('cb-speedometer-modal').style.display = 'flex';
-  });
-  document.getElementById('cb-close-speedometer').addEventListener('click', () => {
-    document.getElementById('cb-speedometer-modal').style.display = 'none';
-  });
-  document.getElementById('cb-alert-clear').addEventListener('click', () => {
-    hideAlertBanner();
-  });
-
-// Topic modal helpers
-let pendingAction = null;
-function showTopicModal(action, prompt) {
-  pendingAction = action;
-  const modal = document.getElementById('cb-topic-modal');
-  const promptEl = document.getElementById('cb-topic-prompt');
-  const input = document.getElementById('cb-topic-input');
-  if (promptEl) promptEl.textContent = prompt;
-  if (input) input.value = '';
-  if (modal) modal.style.display = 'flex';
-}
-
-function hideTopicModal() {
-  const modal = document.getElementById('cb-topic-modal');
-  if (modal) modal.style.display = 'none';
-  pendingAction = null;
-}
-
-function submitTopicAndExecute() {
-  const input = document.getElementById('cb-topic-input');
-  const topic = input ? input.value.trim() : '';
-  if (!topic) {
-    showTempMessage('Please enter a topic');
-    return;
-  }
-  hideTopicModal();
-  if (pendingAction === 'matchQuiz') {
-    executeMatchQuiz(topic);
-  } else if (pendingAction === 'genGif') {
-    executeGenGif(topic);
-  } else if (pendingAction === 'genFlash') {
-    executeGenFlashcard(topic);
-  }
-}
-
-// small temporary toast inside overlay
-function showTempMessage(msg, timeout=3000) {
-  try {
-    const overlay = document.getElementById(OVERLAY_ID);
-    if (!overlay) return;
-    const t = document.createElement('div');
-    t.className = 'cb-temp-msg';
-    t.style.position = 'fixed';
-    t.style.bottom = '22px';
-    t.style.left = '50%';
-    t.style.transform = 'translateX(-50%)';
-    t.style.background = 'rgba(0,0,0,0.85)';
-    t.style.color = '#f3e9d2';
-    t.style.padding = '8px 12px';
-    t.style.borderRadius = '8px';
-    t.style.zIndex = 2147483650;
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(()=>{ try { t.remove(); } catch(e){} }, timeout);
-  } catch(e) { }
-}
-
-// Action execution functions
-function executeMatchQuiz(topic) {
-  showTempMessage('Matching students and triggering quiz...');
-  try { if (chrome && chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'matchAndTriggerQuiz', payload: { topic } }); } catch(e){}
-}
-
-function executeGenGif(topic) {
-  showTempMessage('Generating educational GIF...');
-  try { if (chrome && chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'generateGif', payload: { topic } }); } catch(e){}
-}
-
-function executeGenFlashcard(topic) {
-  showTempMessage('Generating flashcard...');
-  try { if (chrome && chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'generateFlashcard', payload: { topic } }); } catch(e){}
-}
-
-// Wire action buttons to open topic modal
-const matchTriggerBtn = document.getElementById('cb-match-trigger');
-if (matchTriggerBtn) {
-  matchTriggerBtn.addEventListener('click', () => {
-    showTopicModal('matchQuiz', 'What topic for the competitive quiz?');
-  });
-}
-
-const genGifBtn = document.getElementById('cb-gen-gif');
-if (genGifBtn) {
-  genGifBtn.addEventListener('click', () => {
-    showTopicModal('genGif', 'What topic for the GIF?');
-  });
-}
-
-const genFlashBtn = document.getElementById('cb-gen-flashcard');
-if (genFlashBtn) {
-  genFlashBtn.addEventListener('click', () => {
-    showTopicModal('genFlash', 'What topic for the flashcard?');
-  });
-}
-
-// Wire topic modal buttons
-const topicSubmit = document.getElementById('cb-topic-submit');
-if (topicSubmit) topicSubmit.addEventListener('click', submitTopicAndExecute);
-
-const topicCancel = document.getElementById('cb-topic-cancel');
-if (topicCancel) topicCancel.addEventListener('click', hideTopicModal);
-
-// Allow Enter key to submit
-const topicInput = document.getElementById('cb-topic-input');
-if (topicInput) topicInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') submitTopicAndExecute();
-});
-// start/replace periodic getClassScore poll; guard against extension reloads
-if (classScoreIntervalId) {
-  clearInterval(classScoreIntervalId);
-}
-classScoreIntervalId = setInterval(() => {
-  try {
-    if (!window.chrome || !chrome.runtime || !chrome.runtime.sendMessage) return;
-    chrome.runtime.sendMessage({ type: 'getClassScore' }, (resp) => {
-      try {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          // background may be unreachable (extension reloaded/unloaded)
-          console.warn('getClassScore sendMessage error', chrome.runtime.lastError && chrome.runtime.lastError.message);
-          return;
-        }
-        if (!resp) return;
-        // resp should be { ok: true, data: { classScore: ... } } or { ok:false, error: ... }
-        if (resp.ok && resp.data) {
-          try {
-            if (chrome.runtime && chrome.runtime.sendMessage) {
-              chrome.runtime.sendMessage({ type: 'engagementUpdate', payload: resp.data }, () => {
-                if (chrome.runtime && chrome.runtime.lastError) {
-                  // harmless, but log for debugging
-                  console.warn('engagementUpdate sendMessage error', chrome.runtime.lastError && chrome.runtime.lastError.message);
-                }
-              });
-            }
-          } catch (e) {
-            console.warn('engagementUpdate sendMessage exception', e && e.message);
-          }
-        } else {
-          console.warn('getClassScore failed', resp && resp.error);
-        }
-      } catch (inner) {
-        console.error('callback error for getClassScore', inner);
-      }
+    // Engagement Meter button opens speedometer modal
+    document
+      .getElementById("cb-show-engagement")
+      .addEventListener("click", () => {
+        document.getElementById("cb-speedometer-modal").style.display = "flex";
+      });
+    document
+      .getElementById("cb-close-speedometer")
+      .addEventListener("click", () => {
+        document.getElementById("cb-speedometer-modal").style.display = "none";
+      });
+    document.getElementById("cb-alert-clear").addEventListener("click", () => {
+      hideAlertBanner();
     });
-  } catch (e) {
-    // synchronous errors such as "Extension context invalidated"
-    console.warn('getClassScore sendMessage failed (caught)', e && e.message);
-  }
-}, 5000);
-}
 
-// Drag functionality for overlay
+    // Topic modal helpers
+    let pendingAction = null;
+    function showTopicModal(action, prompt) {
+      pendingAction = action;
+      const modal = document.getElementById("cb-topic-modal");
+      const promptEl = document.getElementById("cb-topic-prompt");
+      const input = document.getElementById("cb-topic-input");
+      if (promptEl) promptEl.textContent = prompt;
+      if (input) input.value = "";
+      if (modal) modal.style.display = "flex";
+    }
 
-document.addEventListener('mousedown', (e) => {
-  const overlay = document.getElementById(OVERLAY_ID);
-  if (!overlay) return;
-  
-  const card = overlay.querySelector('.cb-card');
-  if (!card || !card.contains(e.target) || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-  
-  isDragging = true;
-  card.classList.add('dragging');
-  
-  const rect = overlay.getBoundingClientRect();
-  offset.x = e.clientX - rect.left;
-  offset.y = e.clientY - rect.top;
-});
+    function hideTopicModal() {
+      const modal = document.getElementById("cb-topic-modal");
+      if (modal) modal.style.display = "none";
+      pendingAction = null;
+    }
 
-document.addEventListener('mousemove', (e) => {
-  if (!isDragging) return;
-  
-  const overlay = document.getElementById(OVERLAY_ID);
-  if (!overlay) return;
-  
-  overlay.style.left = (e.clientX - offset.x) + 'px';
-  overlay.style.top = (e.clientY - offset.y) + 'px';
-  overlay.style.right = 'auto';
-  overlay.style.bottom = 'auto';
-});
+    function submitTopicAndExecute() {
+      const input = document.getElementById("cb-topic-input");
+      const topic = input ? input.value.trim() : "";
+      if (!topic) {
+        showTempMessage("Please enter a topic");
+        return;
+      }
+      hideTopicModal();
+      if (pendingAction === "matchQuiz") {
+        executeMatchQuiz(topic);
+      } else if (pendingAction === "genGif") {
+        executeGenGif(topic);
+      } else if (pendingAction === "genFlash") {
+        executeGenFlashcard(topic);
+      }
+    }
 
-document.addEventListener('mouseup', () => {
-  if (!isDragging) return;
-  
-  isDragging = false;
-  const card = document.querySelector('.cb-card');
-  if (card) card.classList.remove('dragging');
-});
+    // small temporary toast inside overlay
+    function showTempMessage(msg, timeout = 3000) {
+      try {
+        const overlay = document.getElementById(OVERLAY_ID);
+        if (!overlay) return;
+        const t = document.createElement("div");
+        t.className = "cb-temp-msg";
+        t.style.position = "fixed";
+        t.style.bottom = "22px";
+        t.style.left = "50%";
+        t.style.transform = "translateX(-50%)";
+        t.style.background = "rgba(0,0,0,0.85)";
+        t.style.color = "#f3e9d2";
+        t.style.padding = "8px 12px";
+        t.style.borderRadius = "8px";
+        t.style.zIndex = 2147483650;
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => {
+          try {
+            t.remove();
+          } catch (e) {}
+        }, timeout);
+      } catch (e) {}
+    }
 
+    // Action execution functions
+    function executeMatchQuiz(topic) {
+      showTempMessage("Matching students and triggering quiz...");
+      try {
+        if (chrome && chrome.runtime && chrome.runtime.sendMessage)
+          chrome.runtime.sendMessage({
+            type: "matchAndTriggerQuiz",
+            payload: { topic },
+          });
+      } catch (e) {}
+    }
 
-// Wait for the Meet page to load and keep trying (Meet loads dynamically)
-const observer = new MutationObserver((mutations, obs) => {
-// Insert overlay once a root element is present
-if (document.body) {
-createOverlay();
-}
-});
-observer.observe(document, { childList: true, subtree: true });
+    function executeGenGif(topic) {
+      showTempMessage("Generating educational GIF...");
+      try {
+        if (chrome && chrome.runtime && chrome.runtime.sendMessage)
+          chrome.runtime.sendMessage({
+            type: "generateGif",
+            payload: { topic },
+          });
+      } catch (e) {}
+    }
 
+    function executeGenFlashcard(topic) {
+      showTempMessage("Generating flashcard...");
+      try {
+        if (chrome && chrome.runtime && chrome.runtime.sendMessage)
+          chrome.runtime.sendMessage({
+            type: "generateFlashcard",
+            payload: { topic },
+          });
+      } catch (e) {}
+    }
 
-// Also try after a short delay in case MutationObserver misses initial load
-setTimeout(createOverlay, 1500);
-// clear interval when page is unloading so we don't try to message invalidated extension
-window.addEventListener('unload', () => {
-  try {
+    // Extract participant names from Google Meet
+    function getParticipantNames() {
+      const participants = [];
+
+      // Try to find participant names from the Meet UI
+      // Look for participant list items
+      const participantItems = document.querySelectorAll(
+        "[data-participant-id]"
+      );
+
+      participantItems.forEach((item) => {
+        const nameElement = item.querySelector("[data-is-presenter], span");
+        if (nameElement) {
+          const name = nameElement.textContent.trim();
+          if (name && name.length > 0) {
+            participants.push(name);
+          }
+        }
+      });
+
+      // Alternative: try to find names in the participant panel
+      if (participants.length === 0) {
+        const participantPanel = document.querySelector(
+          '[aria-label*="participant"], [role="listbox"]'
+        );
+        if (participantPanel) {
+          const nameElements = participantPanel.querySelectorAll("span, div");
+          nameElements.forEach((el) => {
+            const text = el.textContent.trim();
+            if (
+              text &&
+              text.length > 2 &&
+              text.length < 50 &&
+              !text.includes("participant") &&
+              !text.includes("Participant")
+            ) {
+              if (!participants.includes(text)) {
+                participants.push(text);
+              }
+            }
+          });
+        }
+      }
+
+      return [...new Set(participants)].filter((p) => p.length > 0);
+    }
+
+    // Shuffle array (Fisher-Yates)
+    function shuffleArray(arr) {
+      const shuffled = [...arr];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    }
+
+    // Pair participants
+    function pairParticipants(participants) {
+      const shuffled = shuffleArray(participants);
+      const pairs = [];
+
+      for (let i = 0; i < shuffled.length; i += 2) {
+        if (i + 1 < shuffled.length) {
+          const randomId = Math.floor(Math.random() * 10000) + 1000;
+          pairs.push({
+            name1: shuffled[i],
+            name2: shuffled[i + 1],
+            roomId: randomId,
+          });
+        } else if (shuffled.length % 2 === 1) {
+          // Handle odd number - create pair with last person as facilitator or create their own room
+          pairs.push({
+            name1: shuffled[i],
+            name2: "Self Study",
+            roomId: Math.floor(Math.random() * 10000) + 1000,
+          });
+        }
+      }
+
+      return pairs;
+    }
+
+    // Post message to Google Meet chat
+    function postToChat(message) {
+      return new Promise((resolve) => {
+        try {
+          // Find the chat input area
+          const chatInputAreas = document.querySelectorAll(
+            '[contenteditable="true"], textarea, input[placeholder*="chat"], input[placeholder*="message"]'
+          );
+
+          let chatInput = null;
+          for (let input of chatInputAreas) {
+            const parent = input.parentElement;
+            // Look for send button nearby to confirm this is the chat input
+            const sendBtn = parent
+              ? parent.querySelector(
+                  'button[aria-label*="send"], button[aria-label*="Send"]'
+                )
+              : null;
+            if (
+              sendBtn ||
+              input.placeholder.toLowerCase().includes("message")
+            ) {
+              chatInput = input;
+              break;
+            }
+          }
+
+          if (chatInput) {
+            // Set the text
+            if (chatInput.contentEditable === "true") {
+              chatInput.textContent = message;
+              chatInput.innerText = message;
+            } else {
+              chatInput.value = message;
+            }
+
+            // Trigger input event
+            const inputEvent = new Event("input", { bubbles: true });
+            chatInput.dispatchEvent(inputEvent);
+
+            // Find and click send button
+            const sendBtn = chatInput
+              .closest('[role="region"]')
+              ?.querySelector(
+                'button[aria-label*="send"], button[aria-label*="Send"], button[type="submit"]'
+              );
+            if (sendBtn) {
+              setTimeout(() => {
+                sendBtn.click();
+                resolve(true);
+              }, 100);
+            } else {
+              // Try pressing Enter
+              const enterEvent = new KeyboardEvent("keydown", {
+                key: "Enter",
+                code: "Enter",
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+              });
+              chatInput.dispatchEvent(enterEvent);
+              setTimeout(() => resolve(true), 100);
+            }
+          } else {
+            console.error("Chat input not found");
+            resolve(false);
+          }
+        } catch (e) {
+          console.error("Error posting to chat:", e);
+          resolve(false);
+        }
+      });
+    }
+
+    // Main execution function
+    async function executePairAndPostLinks() {
+      showTempMessage("Getting participants...");
+
+      const participants = getParticipantNames();
+
+      if (participants.length < 2) {
+        showTempMessage("Need at least 2 participants to pair");
+        return;
+      }
+
+      showTempMessage(
+        `Found ${participants.length} participants. Creating pairs...`
+      );
+
+      const pairs = pairParticipants(participants);
+
+      // Create default quiz (can be customized later)
+      const defaultQuiz = {
+        title: "Competitive Quiz",
+        description: "A quick competitive quiz for paired participants",
+        questions: [
+          {
+            question: "What is 2 + 2?",
+            options: ["3", "4", "5", "6"],
+            correct_answer: 1,
+          },
+          {
+            question: "What is the capital of France?",
+            options: ["London", "Berlin", "Paris", "Madrid"],
+            correct_answer: 2,
+          },
+          {
+            question: "Which planet is closest to the Sun?",
+            options: ["Venus", "Mercury", "Earth", "Mars"],
+            correct_answer: 1,
+          },
+        ],
+        duration: 60,
+        difficulty: "easy",
+      };
+
+      // Build chat messages with quiz links
+      let chatMessage = "Pair Assignments with Quiz Links:\n\n";
+
+      for (let i = 0; i < pairs.length; i++) {
+        const pair = pairs[i];
+
+        // Create quiz for this pair via API
+        let quizId = null;
+        try {
+          const quizResponse = await fetch(
+            "http://127.0.0.1:8000/api/quiz/create/",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(defaultQuiz),
+            }
+          );
+
+          if (quizResponse.ok) {
+            const quizData = await quizResponse.json();
+            if (quizData.ok) {
+              quizId = quizData.data.id;
+            }
+          }
+        } catch (e) {
+          console.error("Error creating quiz:", e);
+        }
+
+        // Generate room link with quiz parameter
+        const roomLink = quizId
+          ? `http://127.0.0.1:8000/chat/${pair.roomId}?quiz=${quizId}`
+          : `http://127.0.0.1:8000/chat/${pair.roomId}`;
+
+        chatMessage += `${pair.name1}-${pair.name2}: ${roomLink}\n`;
+      }
+
+      console.log("Chat message to send:", chatMessage);
+      showTempMessage("Posting to chat...");
+
+      // Post to chat
+      const posted = await postToChat(chatMessage);
+
+      if (posted) {
+        showTempMessage("Chat links posted successfully!");
+      } else {
+        showTempMessage("Failed to post to chat. Message copied to console.");
+        console.log("Chat message:", chatMessage);
+      }
+    }
+
+    // Pair participants and post chat links
+    const pairParticipantsBtn = document.getElementById("cb-pair-participants");
+    if (pairParticipantsBtn) {
+      pairParticipantsBtn.addEventListener("click", () => {
+        executePairAndPostLinks();
+      });
+    }
+
+    // Wire action buttons to open topic modal
+    const matchTriggerBtn = document.getElementById("cb-match-trigger");
+    if (matchTriggerBtn) {
+      matchTriggerBtn.addEventListener("click", () => {
+        showTopicModal("matchQuiz", "What topic for the competitive quiz?");
+      });
+    }
+
+    const genGifBtn = document.getElementById("cb-gen-gif");
+    if (genGifBtn) {
+      genGifBtn.addEventListener("click", () => {
+        showTopicModal("genGif", "What topic for the GIF?");
+      });
+    }
+
+    const genFlashBtn = document.getElementById("cb-gen-flashcard");
+    if (genFlashBtn) {
+      genFlashBtn.addEventListener("click", () => {
+        showTopicModal("genFlash", "What topic for the flashcard?");
+      });
+    }
+
+    // Wire topic modal buttons
+    const topicSubmit = document.getElementById("cb-topic-submit");
+    if (topicSubmit)
+      topicSubmit.addEventListener("click", submitTopicAndExecute);
+
+    const topicCancel = document.getElementById("cb-topic-cancel");
+    if (topicCancel) topicCancel.addEventListener("click", hideTopicModal);
+
+    // Allow Enter key to submit
+    const topicInput = document.getElementById("cb-topic-input");
+    if (topicInput)
+      topicInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submitTopicAndExecute();
+      });
+    // start/replace periodic getClassScore poll; guard against extension reloads
     if (classScoreIntervalId) {
       clearInterval(classScoreIntervalId);
-      classScoreIntervalId = null;
     }
-  } catch (e) { }
-});
+    classScoreIntervalId = setInterval(() => {
+      try {
+        if (!window.chrome || !chrome.runtime || !chrome.runtime.sendMessage)
+          return;
+        chrome.runtime.sendMessage({ type: "getClassScore" }, (resp) => {
+          try {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              // background may be unreachable (extension reloaded/unloaded)
+              console.warn(
+                "getClassScore sendMessage error",
+                chrome.runtime.lastError && chrome.runtime.lastError.message
+              );
+              return;
+            }
+            if (!resp) return;
+            // resp should be { ok: true, data: { classScore: ... } } or { ok:false, error: ... }
+            if (resp.ok && resp.data) {
+              try {
+                if (chrome.runtime && chrome.runtime.sendMessage) {
+                  chrome.runtime.sendMessage(
+                    { type: "engagementUpdate", payload: resp.data },
+                    () => {
+                      if (chrome.runtime && chrome.runtime.lastError) {
+                        // harmless, but log for debugging
+                        console.warn(
+                          "engagementUpdate sendMessage error",
+                          chrome.runtime.lastError &&
+                            chrome.runtime.lastError.message
+                        );
+                      }
+                    }
+                  );
+                }
+              } catch (e) {
+                console.warn(
+                  "engagementUpdate sendMessage exception",
+                  e && e.message
+                );
+              }
+            } else {
+              console.warn("getClassScore failed", resp && resp.error);
+            }
+          } catch (inner) {
+            console.error("callback error for getClassScore", inner);
+          }
+        });
+      } catch (e) {
+        // synchronous errors such as "Extension context invalidated"
+        console.warn(
+          "getClassScore sendMessage failed (caught)",
+          e && e.message
+        );
+      }
+    }, 5000);
+  }
+
+  // Drag functionality for overlay
+
+  document.addEventListener("mousedown", (e) => {
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+
+    const card = overlay.querySelector(".cb-card");
+    if (
+      !card ||
+      !card.contains(e.target) ||
+      e.target.tagName === "BUTTON" ||
+      e.target.tagName === "INPUT"
+    )
+      return;
+
+    isDragging = true;
+    card.classList.add("dragging");
+
+    const rect = overlay.getBoundingClientRect();
+    offset.x = e.clientX - rect.left;
+    offset.y = e.clientY - rect.top;
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+
+    overlay.style.left = e.clientX - offset.x + "px";
+    overlay.style.top = e.clientY - offset.y + "px";
+    overlay.style.right = "auto";
+    overlay.style.bottom = "auto";
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!isDragging) return;
+
+    isDragging = false;
+    const card = document.querySelector(".cb-card");
+    if (card) card.classList.remove("dragging");
+  });
+
+  // Wait for the Meet page to load and keep trying (Meet loads dynamically)
+  const observer = new MutationObserver((mutations, obs) => {
+    // Insert overlay once a root element is present
+    if (document.body) {
+      createOverlay();
+    }
+  });
+  observer.observe(document, { childList: true, subtree: true });
+
+  // Also try after a short delay in case MutationObserver misses initial load
+  setTimeout(createOverlay, 1500);
+  // clear interval when page is unloading so we don't try to message invalidated extension
+  window.addEventListener("unload", () => {
+    try {
+      if (classScoreIntervalId) {
+        clearInterval(classScoreIntervalId);
+        classScoreIntervalId = null;
+      }
+    } catch (e) {}
+  });
 })();
 
 // content-engage.js (add into content.js)
-(function() {
+(function () {
   const INTERVAL = 10000; // 10s
   let lastMouseTs = Date.now();
-  let chatCount = 0, reactionCount = 0, lastPollAnswer = 0, lastQuizAnswer = 0;
+  let chatCount = 0,
+    reactionCount = 0,
+    lastPollAnswer = 0,
+    lastQuizAnswer = 0;
 
   // simple mouse/keyboard activity
-  window.addEventListener('mousemove', () => lastMouseTs = Date.now());
-  window.addEventListener('keydown', () => lastMouseTs = Date.now());
+  window.addEventListener("mousemove", () => (lastMouseTs = Date.now()));
+  window.addEventListener("keydown", () => (lastMouseTs = Date.now()));
 
   // hook: your quiz/poll UI should dispatch these events on answer
-  window.addEventListener('classboost:pollAnswered', () => lastPollAnswer = Date.now());
-  window.addEventListener('classboost:quizAnswered', () => lastQuizAnswer = Date.now());
+  window.addEventListener(
+    "classboost:pollAnswered",
+    () => (lastPollAnswer = Date.now())
+  );
+  window.addEventListener(
+    "classboost:quizAnswered",
+    () => (lastQuizAnswer = Date.now())
+  );
 
   // WATCH chat/reaction via MutationObserver (broad; refine later)
-  const obs = new MutationObserver(muts => {
-    muts.forEach(m => m.addedNodes.forEach(n=>{
-      try {
-        if (n.nodeType === Node.ELEMENT_NODE && n.innerText && n.innerText.length>1) chatCount++;
-        // heuristics: if node contains emoji-only or aria-label like 'reaction' increment reactionCount
-        if (n.innerText && /[\u{1F300}-\u{1FAFF}]/u.test(n.innerText)) reactionCount++;
-      } catch(e){ }
-    }));
+  const obs = new MutationObserver((muts) => {
+    muts.forEach((m) =>
+      m.addedNodes.forEach((n) => {
+        try {
+          if (
+            n.nodeType === Node.ELEMENT_NODE &&
+            n.innerText &&
+            n.innerText.length > 1
+          )
+            chatCount++;
+          // heuristics: if node contains emoji-only or aria-label like 'reaction' increment reactionCount
+          if (n.innerText && /[\u{1F300}-\u{1FAFF}]/u.test(n.innerText))
+            reactionCount++;
+        } catch (e) {}
+      })
+    );
   });
-  obs.observe(document.body, { childList:true, subtree:true });
+  obs.observe(document.body, { childList: true, subtree: true });
 
   function computeSnapshot() {
     const now = Date.now();
-    const poll = (now - lastPollAnswer) < 60000 ? 1 : 0;
-    const quiz = (now - lastQuizAnswer) < 60000 ? 1 : 0;
-    const chatNorm = Math.min(chatCount/3, 1);
-    const reactNorm = Math.min(reactionCount/2, 1);
+    const poll = now - lastPollAnswer < 60000 ? 1 : 0;
+    const quiz = now - lastQuizAnswer < 60000 ? 1 : 0;
+    const chatNorm = Math.min(chatCount / 3, 1);
+    const reactNorm = Math.min(reactionCount / 2, 1);
     const focus = document.hidden ? 0 : 1;
-    const mouseNorm = (Date.now() - lastMouseTs) < 60000 ? 1 : 0;
+    const mouseNorm = Date.now() - lastMouseTs < 60000 ? 1 : 0;
 
-    const raw = 0.3*poll + 0.3*quiz + 0.15*chatNorm + 0.1*reactNorm + 0.1*focus + 0.05*mouseNorm;
+    const raw =
+      0.3 * poll +
+      0.3 * quiz +
+      0.15 * chatNorm +
+      0.1 * reactNorm +
+      0.1 * focus +
+      0.05 * mouseNorm;
 
     // send to background to forward to server
     try {
       if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'engagementSnapshot', snapshot: { raw, components:{poll,quiz,chatNorm,reactNorm,focus,mouseNorm}, ts: now } }, (resp) => {
-          if (chrome.runtime && chrome.runtime.lastError) {
-            console.warn('engagementSnapshot sendMessage error', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        chrome.runtime.sendMessage(
+          {
+            type: "engagementSnapshot",
+            snapshot: {
+              raw,
+              components: { poll, quiz, chatNorm, reactNorm, focus, mouseNorm },
+              ts: now,
+            },
+          },
+          (resp) => {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              console.warn(
+                "engagementSnapshot sendMessage error",
+                chrome.runtime.lastError && chrome.runtime.lastError.message
+              );
+            }
           }
-        });
+        );
       }
     } catch (e) {
-      console.warn('engagementSnapshot sendMessage failed', e && e.message);
+      console.warn("engagementSnapshot sendMessage failed", e && e.message);
     }
 
     // reset counters
-    chatCount = 0; reactionCount = 0;
+    chatCount = 0;
+    reactionCount = 0;
   }
 
   setInterval(computeSnapshot, INTERVAL);
 })();
 
-
-if (window.chrome && chrome.runtime && chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
+if (
+  window.chrome &&
+  chrome.runtime &&
+  chrome.runtime.onMessage &&
+  chrome.runtime.onMessage.addListener
+) {
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       try {
-        if (msg.type === 'engagementUpdate' || msg.payload?.classScore !== undefined) {
+        if (
+          msg.type === "engagementUpdate" ||
+          msg.payload?.classScore !== undefined
+        ) {
           const val = msg.payload ? msg.payload.classScore : msg.classScore;
           updateGauge(val);
         }
         // Start competitive quiz on student tabs
-        if (msg.type === 'startCompetitiveQuiz' && msg.payload) {
-          try { showCompetitiveQuiz(msg.payload); } catch (e) { }
+        if (msg.type === "startCompetitiveQuiz" && msg.payload) {
+          try {
+            showCompetitiveQuiz(msg.payload);
+          } catch (e) {}
         }
         // Student receives quiz result
-        if (msg.type === 'quizResult' && msg.payload) {
-          try { showQuizOutcome(msg.payload); } catch (e) { }
+        if (msg.type === "quizResult" && msg.payload) {
+          try {
+            showQuizOutcome(msg.payload);
+          } catch (e) {}
         }
         // Teacher / all tabs can receive finished event to display results
-        if (msg.type === 'competitiveQuizFinished' && msg.payload) {
-          try { showCompetitiveSummary(msg.payload); } catch (e) { }
+        if (msg.type === "competitiveQuizFinished" && msg.payload) {
+          try {
+            showCompetitiveSummary(msg.payload);
+          } catch (e) {}
         }
-      } catch (e) { console.warn('onMessage handler error', e && e.message); }
+      } catch (e) {
+        console.warn("onMessage handler error", e && e.message);
+      }
     });
   } catch (e) {
-    console.warn('failed to register onMessage listener', e && e.message);
+    console.warn("failed to register onMessage listener", e && e.message);
   }
 }
 
 function updateGauge(val) {
   try {
     const percent = Math.round(val * 100);
-    const label = val > 0.75 ? 'Engaged' : val > 0.45 ? 'Okay' : 'Low';
+    const label = val > 0.75 ? "Engaged" : val > 0.45 ? "Okay" : "Low";
 
-    const valueEl = document.getElementById('engagement-value');
-    const labelEl = document.getElementById('engagement-label');
-    const gaugeEl = document.getElementById('engagement-gauge');
+    const valueEl = document.getElementById("engagement-value");
+    const labelEl = document.getElementById("engagement-label");
+    const gaugeEl = document.getElementById("engagement-gauge");
 
     if (!valueEl || !labelEl || !gaugeEl) return; // UI not present
 
-    valueEl.innerText = percent + '%';
+    valueEl.innerText = percent + "%";
     labelEl.innerText = label;
-    gaugeEl.style.border = val > 0.75 ? '2px solid #2ecc71' : val > 0.45 ? '2px solid #f1c40f' : '2px solid #e74c3c';
+    gaugeEl.style.border =
+      val > 0.75
+        ? "2px solid #2ecc71"
+        : val > 0.45
+        ? "2px solid #f1c40f"
+        : "2px solid #e74c3c";
   } catch (e) {
-    console.error('updateGauge error', e);
+    console.error("updateGauge error", e);
   }
 }
 
@@ -408,16 +768,16 @@ let speedometerInterval = null;
 let alertShowing = false;
 
 function showAlertBanner() {
-  const b = document.getElementById('cb-alert-banner');
+  const b = document.getElementById("cb-alert-banner");
   if (!b) return;
-  b.classList.add('show');
+  b.classList.add("show");
   alertShowing = true;
 }
 
 function hideAlertBanner() {
-  const b = document.getElementById('cb-alert-banner');
+  const b = document.getElementById("cb-alert-banner");
   if (!b) return;
-  b.classList.remove('show');
+  b.classList.remove("show");
   alertShowing = false;
 }
 
@@ -426,14 +786,15 @@ function setNeedlePercent(val) {
   const degMin = -90; // left
   const degMax = 90; // right
   const deg = degMin + (degMax - degMin) * val;
-  const needle = document.getElementById('needle');
+  const needle = document.getElementById("needle");
   if (needle) {
     needle.style.transform = `translate(0,0) rotate(${deg}deg)`;
   }
-  const p = document.getElementById('spd-percent');
-  const lbl = document.getElementById('spd-label');
-  if (p) p.textContent = Math.round(val*100) + '%';
-  if (lbl) lbl.textContent = val > 0.75 ? 'Engaged' : val > 0.45 ? 'Okay' : 'Low';
+  const p = document.getElementById("spd-percent");
+  const lbl = document.getElementById("spd-label");
+  if (p) p.textContent = Math.round(val * 100) + "%";
+  if (lbl)
+    lbl.textContent = val > 0.75 ? "Engaged" : val > 0.45 ? "Okay" : "Low";
 }
 
 function startTeacherPolling() {
@@ -450,8 +811,9 @@ function stopTeacherPolling() {
 
 function fetchClassScoreAndUpdate() {
   try {
-    if (!window.chrome || !chrome.runtime || !chrome.runtime.sendMessage) return;
-    chrome.runtime.sendMessage({ type: 'getClassScore' }, (resp) => {
+    if (!window.chrome || !chrome.runtime || !chrome.runtime.sendMessage)
+      return;
+    chrome.runtime.sendMessage({ type: "getClassScore" }, (resp) => {
       if (chrome.runtime && chrome.runtime.lastError) return;
       if (!resp || !resp.ok || !resp.data) return;
       const val = Number(resp.data.classScore) || 0;
@@ -468,65 +830,67 @@ function fetchClassScoreAndUpdate() {
         hideAlertBanner();
       }
     });
-  } catch (e) { }
+  } catch (e) {}
 }
 
 // Start polling when overlay is created
 startTeacherPolling();
 
 // clear polling on unload
-window.addEventListener('beforeunload', () => stopTeacherPolling());
+window.addEventListener("beforeunload", () => stopTeacherPolling());
 
 // Competitive quiz UI for students
 function showCompetitiveQuiz(quiz) {
   // remove any existing
   removeCompetitiveQuiz();
-  const modal = document.createElement('div');
-  modal.id = 'cb-competitive-quiz';
-  modal.style.position = 'fixed';
-  modal.style.inset = '0';
-  modal.style.display = 'flex';
-  modal.style.alignItems = 'center';
-  modal.style.justifyContent = 'center';
-  modal.style.background = 'rgba(0,0,0,0.6)';
+  const modal = document.createElement("div");
+  modal.id = "cb-competitive-quiz";
+  modal.style.position = "fixed";
+  modal.style.inset = "0";
+  modal.style.display = "flex";
+  modal.style.alignItems = "center";
+  modal.style.justifyContent = "center";
+  modal.style.background = "rgba(0,0,0,0.6)";
   modal.style.zIndex = 2147483651;
 
-  const card = document.createElement('div');
-  card.style.background = '#0f0f10';
-  card.style.color = '#f3e9d2';
-  card.style.padding = '16px';
-  card.style.borderRadius = '10px';
-  card.style.width = '360px';
-  card.style.textAlign = 'center';
+  const card = document.createElement("div");
+  card.style.background = "#0f0f10";
+  card.style.color = "#f3e9d2";
+  card.style.padding = "16px";
+  card.style.borderRadius = "10px";
+  card.style.width = "360px";
+  card.style.textAlign = "center";
 
-  const q = document.createElement('div');
-  q.textContent = quiz.question || 'Question';
-  q.style.marginBottom = '12px';
-  q.style.fontWeight = '600';
+  const q = document.createElement("div");
+  q.textContent = quiz.question || "Question";
+  q.style.marginBottom = "12px";
+  q.style.fontWeight = "600";
 
-  const opts = document.createElement('div');
-  opts.style.display = 'flex';
-  opts.style.flexDirection = 'column';
-  opts.style.gap = '8px';
+  const opts = document.createElement("div");
+  opts.style.display = "flex";
+  opts.style.flexDirection = "column";
+  opts.style.gap = "8px";
 
   quiz.options.forEach((opt, idx) => {
-    const b = document.createElement('button');
+    const b = document.createElement("button");
     b.textContent = opt;
-    b.className = 'cb-btn';
-    b.style.width = '100%';
-    b.addEventListener('click', () => {
+    b.className = "cb-btn";
+    b.style.width = "100%";
+    b.addEventListener("click", () => {
       submitQuizAnswer(quiz.quizId, idx);
       // disable buttons
-      Array.from(opts.querySelectorAll('button')).forEach(bt => bt.disabled = true);
-      b.style.opacity = '0.8';
+      Array.from(opts.querySelectorAll("button")).forEach(
+        (bt) => (bt.disabled = true)
+      );
+      b.style.opacity = "0.8";
     });
     opts.appendChild(b);
   });
 
-  const timer = document.createElement('div');
-  timer.style.marginTop = '10px';
-  timer.style.fontSize = '13px';
-  timer.id = 'cb-quiz-timer';
+  const timer = document.createElement("div");
+  timer.style.marginTop = "10px";
+  timer.style.fontSize = "13px";
+  timer.id = "cb-quiz-timer";
   card.appendChild(q);
   card.appendChild(opts);
   card.appendChild(timer);
@@ -541,24 +905,38 @@ function showCompetitiveQuiz(quiz) {
     if (remaining < 0) {
       clearInterval(iv);
       // auto-remove after time
-      try { removeCompetitiveQuiz(); } catch (e) {}
+      try {
+        removeCompetitiveQuiz();
+      } catch (e) {}
       return;
     }
-    if (document.getElementById('cb-quiz-timer')) document.getElementById('cb-quiz-timer').textContent = `Time left: ${remaining}s`;
+    if (document.getElementById("cb-quiz-timer"))
+      document.getElementById(
+        "cb-quiz-timer"
+      ).textContent = `Time left: ${remaining}s`;
   }, 1000);
 }
 
 function removeCompetitiveQuiz() {
-  const ex = document.getElementById('cb-competitive-quiz');
-  if (ex) try { ex.remove(); } catch(e){}
+  const ex = document.getElementById("cb-competitive-quiz");
+  if (ex)
+    try {
+      ex.remove();
+    } catch (e) {}
 }
 
 function submitQuizAnswer(quizId, selectedIndex) {
   try {
     if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({ type: 'quizAnswer', payload: { quizId, selectedIndex, ts: Date.now() } }, (resp)=>{});
+      chrome.runtime.sendMessage(
+        {
+          type: "quizAnswer",
+          payload: { quizId, selectedIndex, ts: Date.now() },
+        },
+        (resp) => {}
+      );
     }
-  } catch (e) { }
+  } catch (e) {}
 }
 
 function showQuizOutcome(payload) {
@@ -567,9 +945,21 @@ function showQuizOutcome(payload) {
   const winner = payload.winner;
   const quiz = payload.quiz;
   removeCompetitiveQuiz();
-  const msg = yourCorrect ? (winner ? (winner && winner === undefined ? 'Result' : (winner ? ('' ) : '')) : '') : '';
+  const msg = yourCorrect
+    ? winner
+      ? winner && winner === undefined
+        ? "Result"
+        : winner
+        ? ""
+        : ""
+      : ""
+    : "";
   // simpler message
-  const text = yourCorrect ? (payload.yourCorrect ? 'You answered correctly!' : 'You answered incorrectly.') : 'Time up.';
+  const text = yourCorrect
+    ? payload.yourCorrect
+      ? "You answered correctly!"
+      : "You answered incorrectly."
+    : "Time up.";
   showTempMessage(text, 4000);
 }
 
@@ -578,10 +968,8 @@ function showCompetitiveSummary(payload) {
   const winner = payload.winner;
   const results = payload.results || [];
   if (!winner) {
-    showTempMessage('Competitive quiz finished: no winner', 4000);
+    showTempMessage("Competitive quiz finished: no winner", 4000);
   } else {
-    showTempMessage('Competitive quiz finished. Winner tabId: ' + winner, 5000);
+    showTempMessage("Competitive quiz finished. Winner tabId: " + winner, 5000);
   }
 }
-
-
