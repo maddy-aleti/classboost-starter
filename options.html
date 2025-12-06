@@ -1,0 +1,15 @@
+<!doctype html>
+<html><body>
+<h3>ClassBoost Options</h3>
+<label>Backend URL: <input id="backend" placeholder="https://your-backend.example" /></label>
+<label>Role: <select id="role"><option>student</option><option selected>teacher</option></select></label>
+<button id="save">Save</button>
+<script>
+document.getElementById('save').addEventListener('click', async () => {
+const backend = document.getElementById('backend').value;
+const role = document.getElementById('role').value;
+await chrome.storage.local.set({ backend, role });
+alert('Saved');
+});
+</script>
+</body></html>
