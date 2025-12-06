@@ -1,4 +1,11 @@
 // server/index.js
+require('dotenv').config();
+console.log('=== ENV VARS TEST ===');
+console.log('GOOGLE_API_KEY from .env:', process.env.GOOGLE_API_KEY);
+console.log('GOOGLE_SEARCH_ENGINE_ID from .env:', process.env.GOOGLE_SEARCH_ENGINE_ID);
+console.log('All environment variables with GOOGLE:', Object.keys(process.env).filter(k => k.includes('GOOGLE')).map(k => k + '=' + process.env[k]));
+console.log('=== END ENV TEST ===');
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -32,6 +39,51 @@ app.post('/api/snapshot', (req, res) => {
 
 app.get('/api/classScore', (req, res) => {
   res.json({ classScore: classSmoothed });
+});
+
+// GIF search endpoint using Google Custom Search API
+app.get('/api/searchGif', async (req, res) => {
+  try {
+    const topic = req.query.topic;
+    console.log('[searchGif] Received request for topic:', topic);
+    
+    if (!topic) {
+      console.warn('[searchGif] No topic provided');
+      return res.status(400).json({ error: 'Topic is required' });
+    }
+
+    // Google Custom Search API requires:
+    // 1. API Key: Get from https://console.developers.google.com/
+    // 2. Search Engine ID: Get from https://cse.google.com/cse/
+    const API_KEY = process.env.GOOGLE_API_KEY || 'YOUR_GOOGLE_API_KEY';
+    const SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID || 'YOUR_SEARCH_ENGINE_ID';
+
+    console.log('[searchGif] Using API Key:', API_KEY.substring(0, 10) + '...');
+    console.log('[searchGif] Using Search Engine ID:', SEARCH_ENGINE_ID);
+
+    // Search query: topic + gif
+    const searchQuery = `${topic} gif animated`;
+    const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(searchQuery)}&cx=${SEARCH_ENGINE_ID}&key=${API_KEY}&searchType=image&num=1`;
+
+    console.log('[searchGif] Calling Google API with URL:', url.substring(0, 100) + '...');
+    
+    const response = await fetch(url);
+    const data = await response.json();
+
+    console.log('[searchGif] Google API response:', data.error ? data.error : 'Success, items: ' + (data.items ? data.items.length : 0));
+
+    if (data.items && data.items.length > 0) {
+      const gifUrl = data.items[0].link;
+      console.log('[searchGif] Found GIF URL:', gifUrl);
+      return res.json({ ok: true, gifUrl, topic });
+    } else {
+      console.warn('[searchGif] No GIF found for topic:', topic);
+      return res.json({ ok: false, error: 'No GIF found', topic });
+    }
+  } catch (err) {
+    console.error('[searchGif] Error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 
