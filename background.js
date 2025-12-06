@@ -1,7 +1,9 @@
 // background.js - POST approach (no socket.io)
-console.log('background (POST) running');
+console.log('[Background] Script loaded');
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  console.log('[Background] Received message:', msg.type, msg);
+  
   if (msg.type === 'engagementSnapshot') {
     fetch('http://localhost:3000/api/snapshot', {
       method: 'POST',
@@ -24,13 +26,85 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // keep sendResponse alive
   }
 
+  // Generate GIF from topic using Google Search API
+  if (msg.type === 'generateGif') {
+    console.log('[Background] generateGif handler triggered for topic:', msg.payload?.topic);
+    try {
+      const topic = (msg.payload && msg.payload.topic) || 'educational content';
+      console.log('[Background] Fetching from http://localhost:3000/api/searchGif?topic=' + topic);
+      
+      fetch(`http://localhost:3000/api/searchGif?topic=${encodeURIComponent(topic)}`)
+        .then(r => {
+          console.log('[Background] Fetch response status:', r.status);
+          return r.json();
+        })
+        .then(data => {
+          console.log('[Background] Fetch response data:', data);
+          if (data.ok && data.gifUrl) {
+            console.log('[Background] GIF found, broadcasting to tabs...');
+            // Broadcast GIF result to all tabs
+            chrome.tabs.query({}, (tabs) => {
+              console.log('[Background] Found', tabs.length, 'tabs to broadcast to');
+              tabs.forEach(t => {
+                try {
+                  console.log('[Background] Sending gifResult to tab', t.id);
+                  chrome.tabs.sendMessage(t.id, { 
+                    type: 'gifResult', 
+                    payload: { gifUrl: data.gifUrl, topic, error: null } 
+                  }, () => {
+                    // Ignore errors if tab is not ready
+                    if (chrome.runtime.lastError) {
+                      console.log('[Background] Tab not ready for message:', chrome.runtime.lastError.message);
+                    }
+                  });
+                } catch (e) { 
+                  console.error('[Background] Error sending to tab:', e);
+                }
+              });
+            });
+            sendResponse({ ok: true, gifUrl: data.gifUrl });
+          } else {
+            console.log('[Background] No GIF found');
+            // No GIF found
+            chrome.tabs.query({}, (tabs) => {
+              tabs.forEach(t => {
+                try {
+                  chrome.tabs.sendMessage(t.id, { 
+                    type: 'gifResult', 
+                    payload: { gifUrl: null, topic, error: 'GIF not found' } 
+                  }, () => {
+                    if (chrome.runtime.lastError) {
+                      console.log('[Background] Tab not ready for message:', chrome.runtime.lastError.message);
+                    }
+                  });
+                } catch (e) { }
+              });
+            });
+            sendResponse({ ok: false, error: 'GIF not found' });
+          }
+        })
+        .catch(err => {
+          console.error('[Background] generateGif fetch failed:', err);
+          sendResponse({ ok: false, error: err.message });
+        });
+    } catch (e) {
+      console.error('[Background] generateGif error:', e);
+      sendResponse({ ok: false, error: e && e.message });
+    }
+    return true; // keep sendResponse alive
+  }
+
   // Allow broadcasting an engagementUpdate to all tabs (forward from one tab)
   if (msg.type === 'engagementUpdate' && msg.payload) {
     try {
       chrome.tabs.query({}, (tabs) => {
         tabs.forEach(t => {
           try {
-            chrome.tabs.sendMessage(t.id, { type: 'engagementUpdate', payload: msg.payload });
+            chrome.tabs.sendMessage(t.id, { type: 'engagementUpdate', payload: msg.payload }, () => {
+              if (chrome.runtime.lastError) {
+                // Ignore - tab may not be ready
+              }
+            });
           } catch (e) { }
         });
       });
@@ -71,7 +145,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         // send quiz to both selected tabs
         [a.id, b.id].forEach(tabId => {
-          try { chrome.tabs.sendMessage(tabId, { type: 'startCompetitiveQuiz', payload: quiz }); } catch (e) { }
+          try { 
+            chrome.tabs.sendMessage(tabId, { type: 'startCompetitiveQuiz', payload: quiz }, () => {
+              if (chrome.runtime.lastError) {
+                console.log('Tab not ready for quiz message');
+              }
+            }); 
+          } catch (e) { }
         });
 
         // notify teacher (sender) with selected tab ids
@@ -136,14 +216,24 @@ function evaluateQuiz(quizId) {
     // notify both students and teacher
     results.forEach(r => {
       try {
-        chrome.tabs.sendMessage(r.tabId, { type: 'quizResult', payload: { quizId, yourCorrect: r.correct, winner, quiz } });
+        chrome.tabs.sendMessage(r.tabId, { type: 'quizResult', payload: { quizId, yourCorrect: r.correct, winner, quiz } }, () => {
+          if (chrome.runtime.lastError) {
+            console.log('Tab not ready for quiz result');
+          }
+        });
       } catch (e) { }
     });
 
     // broadcast to teacher UI (all tabs)
     chrome.tabs.query({}, (tabsList) => {
       tabsList.forEach(t => {
-        try { chrome.tabs.sendMessage(t.id, { type: 'competitiveQuizFinished', payload: { quizId, results, winner, quiz } }); } catch (e) { }
+        try { 
+          chrome.tabs.sendMessage(t.id, { type: 'competitiveQuizFinished', payload: { quizId, results, winner, quiz } }, () => {
+            if (chrome.runtime.lastError) {
+              console.log('Tab not ready for quiz finished message');
+            }
+          }); 
+        } catch (e) { }
       });
     });
 

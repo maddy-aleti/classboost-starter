@@ -109,17 +109,30 @@ function hideTopicModal() {
 function submitTopicAndExecute() {
   const input = document.getElementById('cb-topic-input');
   const topic = input ? input.value.trim() : '';
+  console.log('[ContentScript] submitTopicAndExecute called, pendingAction:', pendingAction, 'topic:', topic);
+  console.log('[ContentScript] pendingAction === "genGif"?', pendingAction === 'genGif');
   if (!topic) {
     showTempMessage('Please enter a topic');
     return;
   }
+  
+  // Store pendingAction BEFORE hideTopicModal clears it
+  const action = pendingAction;
+  console.log('[ContentScript] Stored action:', action);
   hideTopicModal();
-  if (pendingAction === 'matchQuiz') {
+  
+  console.log('[ContentScript] After hideTopicModal, checking conditions with action:', action);
+  if (action === 'matchQuiz') {
+    console.log('[ContentScript] Matched matchQuiz');
     executeMatchQuiz(topic);
-  } else if (pendingAction === 'genGif') {
+  } else if (action === 'genGif') {
+    console.log('[ContentScript] Matched genGif, calling executeGenGif...');
     executeGenGif(topic);
-  } else if (pendingAction === 'genFlash') {
+  } else if (action === 'genFlash') {
+    console.log('[ContentScript] Matched genFlash');
     executeGenFlashcard(topic);
+  } else {
+    console.log('[ContentScript] No action matched! action is:', JSON.stringify(action));
   }
 }
 
@@ -152,8 +165,23 @@ function executeMatchQuiz(topic) {
 }
 
 function executeGenGif(topic) {
-  showTempMessage('Generating educational GIF...');
-  try { if (chrome && chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'generateGif', payload: { topic } }); } catch(e){}
+  console.log('[ContentScript] executeGenGif called with topic:', topic);
+  showTempMessage('Searching for GIF...');
+  console.log('[ContentScript] Sending generateGif message to background...');
+  try { 
+    if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: 'generateGif', payload: { topic } }, (response) => {
+        console.log('[ContentScript] Got response from background:', response);
+        if (chrome.runtime.lastError) {
+          console.error('[ContentScript] sendMessage error:', chrome.runtime.lastError);
+        }
+      });
+    } else {
+      console.error('[ContentScript] chrome.runtime.sendMessage not available');
+    }
+  } catch(e) {
+    console.error('[ContentScript] executeGenGif error:', e);
+  }
 }
 
 function executeGenFlashcard(topic) {
@@ -377,6 +405,10 @@ if (window.chrome && chrome.runtime && chrome.runtime.onMessage && chrome.runtim
         if (msg.type === 'competitiveQuizFinished' && msg.payload) {
           try { showCompetitiveSummary(msg.payload); } catch (e) { }
         }
+        // Display GIF result
+        if (msg.type === 'gifResult' && msg.payload) {
+          try { showGifModal(msg.payload); } catch (e) { console.error('Error showing GIF', e); }
+        }
       } catch (e) { console.warn('onMessage handler error', e && e.message); }
     });
   } catch (e) {
@@ -477,7 +509,78 @@ startTeacherPolling();
 // clear polling on unload
 window.addEventListener('beforeunload', () => stopTeacherPolling());
 
-// Competitive quiz UI for students
+// ===== GIF Modal Display =====
+function removeGifModal() {
+  const ex = document.getElementById('cb-gif-modal');
+  if (ex) try { ex.remove(); } catch(e){}
+}
+
+function showGifModal(payload) {
+  removeGifModal();
+  const { gifUrl, topic, error } = payload;
+  
+  if (error) {
+    try {
+      showTempMessage('GIF not found for: ' + topic, 4000);
+    } catch (e) {
+      console.error('[GIF Modal] Error showing temp message:', e);
+      alert('GIF not found for: ' + topic);
+    }
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'cb-gif-modal';
+  modal.style.position = 'fixed';
+  modal.style.inset = '0';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+  modal.style.background = 'rgba(0,0,0,0.7)';
+  modal.style.zIndex = '2147483651';
+
+  const card = document.createElement('div');
+  card.style.background = '#0f0f10';
+  card.style.color = '#f3e9d2';
+  card.style.padding = '20px';
+  card.style.borderRadius = '10px';
+  card.style.width = '500px';
+  card.style.maxWidth = '90vw';
+  card.style.textAlign = 'center';
+  card.style.boxShadow = '0 10px 30px rgba(0,0,0,0.6)';
+
+  const title = document.createElement('h3');
+  title.textContent = 'GIF: ' + topic;
+  title.style.marginBottom = '12px';
+  title.style.color = '#f3e9d2';
+
+  const img = document.createElement('img');
+  img.src = gifUrl;
+  img.style.width = '100%';
+  img.style.borderRadius = '8px';
+  img.style.marginBottom = '12px';
+  img.style.maxHeight = '400px';
+  img.style.objectFit = 'contain';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'Close';
+  closeBtn.className = 'cb-btn';
+  closeBtn.style.width = '100%';
+  closeBtn.addEventListener('click', removeGifModal);
+
+  card.appendChild(title);
+  card.appendChild(img);
+  card.appendChild(closeBtn);
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+
+  // Click outside to close
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) removeGifModal();
+  });
+}
+
+// ===== Competitive Quiz UI =====
 function showCompetitiveQuiz(quiz) {
   // remove any existing
   removeCompetitiveQuiz();
