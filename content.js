@@ -16,31 +16,11 @@ container.innerHTML =`<div class="cb-card">
   <div class="cb-header">ClassBoost — Teacher Panel</div>
 
   <div class="cb-body">
-    <!-- Topic Input -->
-    <label class="cb-label">Topic</label>
-    <input id="cb-topic" type="text" class="cb-input" placeholder="e.g., Overfitting">
-
-    <!-- Toggle switches -->
-    <div class="cb-toggle-row">
-      <span>Quiz Mode</span>
-      <label class="cb-switch">
-        <input type="checkbox" id="cb-quiz-toggle">
-        <span class="cb-slider"></span>
-      </label>
-    </div>
-
-    <div class="cb-toggle-row">
-      <span>Auto GIF Suggestions</span>
-      <label class="cb-switch">
-        <input type="checkbox" id="cb-gif-toggle">
-        <span class="cb-slider"></span>
-      </label>
-    </div>
-
-    <!-- Buttons -->
-    <button id="cb-trigger-quiz" class="cb-btn">Trigger Quiz</button>
-    <button id="cb-match-students" class="cb-btn">Match Students</button>
+    <!-- Buttons (primary actions) -->
     <button id="cb-show-engagement" class="cb-btn">Engagement Meter</button>
+    <button id="cb-match-trigger" class="cb-btn">Match Students & Quiz</button>
+    <button id="cb-gen-gif" class="cb-btn">Generate GIF</button>
+    <button id="cb-gen-flashcard" class="cb-btn">Generate Flashcard</button>
       <!-- Engagement Meter UI -->
   <div id="engagement-gauge" class="cb-gauge" style="padding:10px;margin-top:10px;border-radius:8px;text-align:center;border:2px solid gray;">
     <div id="engagement-value" style="font-size:18px;font-weight:bold;">--%</div>
@@ -75,20 +55,21 @@ container.innerHTML =`<div class="cb-card">
   </div>
 
   <div id="cb-alert-banner" class="cb-alert-banner">Low class attention — please re-engage the class</div>
-
-    <!-- Open Modal -->
-    <button id="cb-open-modal" class="cb-btn-secondary">Open Info Modal</button>
   </div>
 
   <div class="cb-footer">v0.2 UI</div>
 </div>
 
-<!-- Modal -->
-<div id="cb-modal" class="cb-modal" style="display:none;">
+<!-- Topic Input Modal (shared across actions) -->
+<div id="cb-topic-modal" class="cb-modal" style="display:none;">
   <div class="cb-modal-content">
-    <h3>ClassBoost Info</h3>
-    <p>This is a placeholder UI modal. You can wire functionality later.</p>
-    <button id="cb-close-modal" class="cb-btn">Close</button>
+    <h3>Enter Topic</h3>
+    <p id="cb-topic-prompt">What topic are you teaching?</p>
+    <input id="cb-topic-input" type="text" class="cb-input" placeholder="e.g., Overfitting" style="margin-bottom:12px;">
+    <div style="display:flex; gap:8px;">
+      <button id="cb-topic-submit" class="cb-btn" style="flex:1;">Submit</button>
+      <button id="cb-topic-cancel" class="cb-btn-secondary" style="flex:1;">Cancel</button>
+    </div>
   </div>
 </div>`
 
@@ -96,10 +77,6 @@ container.innerHTML =`<div class="cb-card">
 
 document.body.appendChild(container);
 
-
-document.getElementById('cb-open-modal').addEventListener('click', () => {
-document.getElementById('cb-modal').style.display = 'flex';
-});
   // Engagement Meter button opens speedometer modal
   document.getElementById('cb-show-engagement').addEventListener('click', () => {
     document.getElementById('cb-speedometer-modal').style.display = 'flex';
@@ -110,8 +87,113 @@ document.getElementById('cb-modal').style.display = 'flex';
   document.getElementById('cb-alert-clear').addEventListener('click', () => {
     hideAlertBanner();
   });
-document.getElementById('cb-close-modal').addEventListener('click', () => {
-document.getElementById('cb-modal').style.display = 'none';
+
+// Topic modal helpers
+let pendingAction = null;
+function showTopicModal(action, prompt) {
+  pendingAction = action;
+  const modal = document.getElementById('cb-topic-modal');
+  const promptEl = document.getElementById('cb-topic-prompt');
+  const input = document.getElementById('cb-topic-input');
+  if (promptEl) promptEl.textContent = prompt;
+  if (input) input.value = '';
+  if (modal) modal.style.display = 'flex';
+}
+
+function hideTopicModal() {
+  const modal = document.getElementById('cb-topic-modal');
+  if (modal) modal.style.display = 'none';
+  pendingAction = null;
+}
+
+function submitTopicAndExecute() {
+  const input = document.getElementById('cb-topic-input');
+  const topic = input ? input.value.trim() : '';
+  if (!topic) {
+    showTempMessage('Please enter a topic');
+    return;
+  }
+  hideTopicModal();
+  if (pendingAction === 'matchQuiz') {
+    executeMatchQuiz(topic);
+  } else if (pendingAction === 'genGif') {
+    executeGenGif(topic);
+  } else if (pendingAction === 'genFlash') {
+    executeGenFlashcard(topic);
+  }
+}
+
+// small temporary toast inside overlay
+function showTempMessage(msg, timeout=3000) {
+  try {
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+    const t = document.createElement('div');
+    t.className = 'cb-temp-msg';
+    t.style.position = 'fixed';
+    t.style.bottom = '22px';
+    t.style.left = '50%';
+    t.style.transform = 'translateX(-50%)';
+    t.style.background = 'rgba(0,0,0,0.85)';
+    t.style.color = '#f3e9d2';
+    t.style.padding = '8px 12px';
+    t.style.borderRadius = '8px';
+    t.style.zIndex = 2147483650;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(()=>{ try { t.remove(); } catch(e){} }, timeout);
+  } catch(e) { }
+}
+
+// Action execution functions
+function executeMatchQuiz(topic) {
+  showTempMessage('Matching students and triggering quiz...');
+  try { if (chrome && chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'matchAndTriggerQuiz', payload: { topic } }); } catch(e){}
+}
+
+function executeGenGif(topic) {
+  showTempMessage('Generating educational GIF...');
+  try { if (chrome && chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'generateGif', payload: { topic } }); } catch(e){}
+}
+
+function executeGenFlashcard(topic) {
+  showTempMessage('Generating flashcard...');
+  try { if (chrome && chrome.runtime && chrome.runtime.sendMessage) chrome.runtime.sendMessage({ type: 'generateFlashcard', payload: { topic } }); } catch(e){}
+}
+
+// Wire action buttons to open topic modal
+const matchTriggerBtn = document.getElementById('cb-match-trigger');
+if (matchTriggerBtn) {
+  matchTriggerBtn.addEventListener('click', () => {
+    showTopicModal('matchQuiz', 'What topic for the competitive quiz?');
+  });
+}
+
+const genGifBtn = document.getElementById('cb-gen-gif');
+if (genGifBtn) {
+  genGifBtn.addEventListener('click', () => {
+    showTopicModal('genGif', 'What topic for the GIF?');
+  });
+}
+
+const genFlashBtn = document.getElementById('cb-gen-flashcard');
+if (genFlashBtn) {
+  genFlashBtn.addEventListener('click', () => {
+    showTopicModal('genFlash', 'What topic for the flashcard?');
+  });
+}
+
+// Wire topic modal buttons
+const topicSubmit = document.getElementById('cb-topic-submit');
+if (topicSubmit) topicSubmit.addEventListener('click', submitTopicAndExecute);
+
+const topicCancel = document.getElementById('cb-topic-cancel');
+if (topicCancel) topicCancel.addEventListener('click', hideTopicModal);
+
+// Allow Enter key to submit
+const topicInput = document.getElementById('cb-topic-input');
+if (topicInput) topicInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitTopicAndExecute();
 });
 // start/replace periodic getClassScore poll; guard against extension reloads
 if (classScoreIntervalId) {
@@ -283,6 +365,18 @@ if (window.chrome && chrome.runtime && chrome.runtime.onMessage && chrome.runtim
           const val = msg.payload ? msg.payload.classScore : msg.classScore;
           updateGauge(val);
         }
+        // Start competitive quiz on student tabs
+        if (msg.type === 'startCompetitiveQuiz' && msg.payload) {
+          try { showCompetitiveQuiz(msg.payload); } catch (e) { }
+        }
+        // Student receives quiz result
+        if (msg.type === 'quizResult' && msg.payload) {
+          try { showQuizOutcome(msg.payload); } catch (e) { }
+        }
+        // Teacher / all tabs can receive finished event to display results
+        if (msg.type === 'competitiveQuizFinished' && msg.payload) {
+          try { showCompetitiveSummary(msg.payload); } catch (e) { }
+        }
       } catch (e) { console.warn('onMessage handler error', e && e.message); }
     });
   } catch (e) {
@@ -382,5 +476,112 @@ startTeacherPolling();
 
 // clear polling on unload
 window.addEventListener('beforeunload', () => stopTeacherPolling());
+
+// Competitive quiz UI for students
+function showCompetitiveQuiz(quiz) {
+  // remove any existing
+  removeCompetitiveQuiz();
+  const modal = document.createElement('div');
+  modal.id = 'cb-competitive-quiz';
+  modal.style.position = 'fixed';
+  modal.style.inset = '0';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+  modal.style.background = 'rgba(0,0,0,0.6)';
+  modal.style.zIndex = 2147483651;
+
+  const card = document.createElement('div');
+  card.style.background = '#0f0f10';
+  card.style.color = '#f3e9d2';
+  card.style.padding = '16px';
+  card.style.borderRadius = '10px';
+  card.style.width = '360px';
+  card.style.textAlign = 'center';
+
+  const q = document.createElement('div');
+  q.textContent = quiz.question || 'Question';
+  q.style.marginBottom = '12px';
+  q.style.fontWeight = '600';
+
+  const opts = document.createElement('div');
+  opts.style.display = 'flex';
+  opts.style.flexDirection = 'column';
+  opts.style.gap = '8px';
+
+  quiz.options.forEach((opt, idx) => {
+    const b = document.createElement('button');
+    b.textContent = opt;
+    b.className = 'cb-btn';
+    b.style.width = '100%';
+    b.addEventListener('click', () => {
+      submitQuizAnswer(quiz.quizId, idx);
+      // disable buttons
+      Array.from(opts.querySelectorAll('button')).forEach(bt => bt.disabled = true);
+      b.style.opacity = '0.8';
+    });
+    opts.appendChild(b);
+  });
+
+  const timer = document.createElement('div');
+  timer.style.marginTop = '10px';
+  timer.style.fontSize = '13px';
+  timer.id = 'cb-quiz-timer';
+  card.appendChild(q);
+  card.appendChild(opts);
+  card.appendChild(timer);
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+
+  // start countdown
+  let remaining = quiz.duration || 60;
+  timer.textContent = `Time left: ${remaining}s`;
+  const iv = setInterval(() => {
+    remaining -= 1;
+    if (remaining < 0) {
+      clearInterval(iv);
+      // auto-remove after time
+      try { removeCompetitiveQuiz(); } catch (e) {}
+      return;
+    }
+    if (document.getElementById('cb-quiz-timer')) document.getElementById('cb-quiz-timer').textContent = `Time left: ${remaining}s`;
+  }, 1000);
+}
+
+function removeCompetitiveQuiz() {
+  const ex = document.getElementById('cb-competitive-quiz');
+  if (ex) try { ex.remove(); } catch(e){}
+}
+
+function submitQuizAnswer(quizId, selectedIndex) {
+  try {
+    if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: 'quizAnswer', payload: { quizId, selectedIndex, ts: Date.now() } }, (resp)=>{});
+    }
+  } catch (e) { }
+}
+
+function showQuizOutcome(payload) {
+  // show a small toast informing student whether they won or were correct
+  const yourCorrect = payload.yourCorrect;
+  const winner = payload.winner;
+  const quiz = payload.quiz;
+  removeCompetitiveQuiz();
+  const msg = yourCorrect ? (winner ? (winner && winner === undefined ? 'Result' : (winner ? ('' ) : '')) : '') : '';
+  // simpler message
+  const text = yourCorrect ? (payload.yourCorrect ? 'You answered correctly!' : 'You answered incorrectly.') : 'Time up.';
+  showTempMessage(text, 4000);
+}
+
+function showCompetitiveSummary(payload) {
+  // show teacher and others the summary briefly
+  const winner = payload.winner;
+  const results = payload.results || [];
+  if (!winner) {
+    showTempMessage('Competitive quiz finished: no winner', 4000);
+  } else {
+    showTempMessage('Competitive quiz finished. Winner tabId: ' + winner, 5000);
+  }
+}
 
 
