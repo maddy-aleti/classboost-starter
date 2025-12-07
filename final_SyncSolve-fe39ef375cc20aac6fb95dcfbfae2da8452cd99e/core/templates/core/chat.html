@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitive Quiz Room</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: background 0.3s, color 0.3s;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .dark-mode {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e4e4e7;
+        }
+        
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            color: #1f2937;
+            padding: 20px 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 100;
+        }
+        
+        .dark-mode header {
+            background: rgba(30, 30, 46, 0.95);
+            color: #e4e4e7;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-grow: 1;
+        }
+        
+        .header-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        #online-users {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #f3f4f6;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6b7280;
+        }
+        
+        .dark-mode #online-users {
+            background: rgba(255, 255, 255, 0.1);
+            color: #9ca3af;
+        }
+        
+        .online-indicator {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .toggle-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+        }
+        
+        .toggle-btn:active {
+            transform: translateY(0);
+        }
+        
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            gap: 20px;
+            overflow: hidden;
+        }
+        
+        #chat-box {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .dark-mode #chat-box {
+            background: rgba(30, 30, 46, 0.95);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        #chat-box::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #chat-box::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        #chat-box::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+        
+        .dark-mode #chat-box::-webkit-scrollbar-thumb {
+            background: #4b5563;
+        }
+        
+        .message {
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-radius: 12px;
+            border-left: 3px solid #667eea;
+            animation: messageSlide 0.3s ease-out;
+            line-height: 1.6;
+        }
+        
+        .dark-mode .message {
+            background: rgba(255, 255, 255, 0.05);
+            border-left-color: #818cf8;
+        }
+        
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message b {
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .dark-mode .message b {
+            color: #818cf8;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+        
+        .dark-mode .input-container {
+            background: rgba(30, 30, 46, 0.95);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        input {
+            flex-grow: 1;
+            padding: 14px 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: all 0.2s;
+            background: white;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .dark-mode input {
+            background: rgba(255, 255, 255, 0.05);
+            color: #e4e4e7;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .dark-mode input:focus {
+            border-color: #818cf8;
+            box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 32px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            font-family: inherit;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        /* Quiz Modal Styles */
+        #quiz-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        #quiz-modal.show {
+            display: flex;
+        }
+        
+        .quiz-container {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 700px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .dark-mode .quiz-container {
+            background: #1e1e2e;
+            color: #e4e4e7;
+        }
+        
+        .quiz-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .quiz-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .quiz-container::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+        
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .dark-mode .quiz-header {
+            border-bottom-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .quiz-timer {
+            font-size: 28px;
+            font-weight: 700;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 8px 20px;
+            border-radius: 12px;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .quiz-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        .dark-mode .quiz-title {
+            color: #e4e4e7;
+        }
+        
+        .question-container {
+            margin-bottom: 30px;
+            padding: 25px;
+            background: #f9fafb;
+            border-radius: 16px;
+            transition: all 0.3s;
+        }
+        
+        .dark-mode .question-container {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        .question-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        
+        .dark-mode .question-text {
+            color: #e4e4e7;
+        }
+        
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .option-btn {
+            padding: 16px 20px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 15px;
+            text-align: left;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-family: inherit;
+        }
+        
+        .dark-mode .option-btn {
+            background: rgba(255, 255, 255, 0.05);
+            color: #e4e4e7;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .option-btn:hover {
+            border-color: #667eea;
+            background: #f3f4f6;
+            transform: translateX(4px);
+        }
+        
+        .dark-mode .option-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: #818cf8;
+        }
+        
+        .option-btn.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .option-btn.correct {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-color: #10b981;
+        }
+        
+        .option-btn.incorrect {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border-color: #ef4444;
+        }
+        
+        #submit-quiz-btn {
+            width: 100%;
+            margin-top: 20px;
+            padding: 16px;
+            font-size: 16px;
+        }
+        
+        .results-container {
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .results-message {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .results-details {
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .results-details > div {
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 16px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .dark-mode .results-details > div {
+            background: rgba(255, 255, 255, 0.05);
+            border-left-color: #818cf8;
+        }
+        
+        @media (max-width: 768px) {
+            header {
+                padding: 15px 20px;
+            }
+            
+            .header-title {
+                font-size: 18px;
+            }
+            
+            #online-users {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+            
+            main {
+                padding: 15px;
+                gap: 15px;
+            }
+            
+            #chat-box {
+                padding: 15px;
+                border-radius: 16px;
+            }
+            
+            .input-container {
+                padding: 15px;
+                border-radius: 16px;
+            }
+            
+            input {
+                padding: 12px 16px;
+                font-size: 14px;
+            }
+            
+            button {
+                padding: 12px 24px;
+                font-size: 14px;
+            }
+            
+            .quiz-container {
+                padding: 25px;
+                border-radius: 20px;
+            }
+            
+            .quiz-title {
+                font-size: 20px;
+            }
+            
+            .question-text {
+                font-size: 16px;
+            }
+            
+            .question-container {
+                padding: 20px;
+            }
+        }
+    </style>
+    <script>
+        var problemId = "{{ problem_id }}";
+        var quizData = null;
+        var quizStartTime = null;
+        var quizDuration = 0;
+        var selectedAnswers = {};
+        var timerInterval = null;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const quizId = urlParams.get('quiz');
+        
+        var ws = new WebSocket(
+            (window.location.protocol === "https:" ? "wss://" : "ws://") +
+            window.location.host +
+            `/ws/chat/${problemId}/?quiz=${quizId || ''}`
+        );
+
+        ws.onmessage = function(event) {
+            var data = JSON.parse(event.data);
+            var chatBox = document.getElementById("chat-box");
+
+            if (data.type === "online_users") {
+                const count = document.querySelector("#online-users .count");
+                if (count) count.innerText = data.count;
+            } else if (data.type === "quiz_start") {
+                displayQuiz(data);
+            } else if (data.type === "partner_submitted") {
+                chatBox.innerHTML += `<p class="message"><b style="color:#ef4444;">System:</b> ${data.message}</p>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } else if (data.type === "quiz_results") {
+                displayResults(data.data);
+            } else if (data.type === "error") {
+                chatBox.innerHTML += `<p class="message" style="color: #ef4444;"><b>Error:</b> ${data.message}</p>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } else {
+                chatBox.innerHTML += `<p class="message"><b>${data.username}:</b> ${data.message}</p>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        };
+
+        function displayQuiz(data) {
+            quizData = data;
+            quizDuration = data.duration;
+            quizStartTime = new Date(data.start_time);
+            selectedAnswers = {};
+            
+            const modal = document.getElementById("quiz-modal");
+            const container = document.getElementById("quiz-container");
+            container.innerHTML = '';
+            
+            const header = document.createElement('div');
+            header.className = 'quiz-header';
+            header.innerHTML = `
+                <div class="quiz-title">📝 ${data.questions.length} Questions</div>
+                <div class="quiz-timer" id="quiz-timer">${quizDuration}s</div>
+            `;
+            container.appendChild(header);
+            
+            data.questions.forEach((q, idx) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-container';
+                
+                const questionText = document.createElement('div');
+                questionText.className = 'question-text';
+                questionText.innerHTML = `<b>Q${idx + 1}:</b> ${q.question}`;
+                questionDiv.appendChild(questionText);
+                
+                const optionsDiv = document.createElement('div');
+                optionsDiv.className = 'options-container';
+                
+                q.options.forEach((opt, optIdx) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.textContent = `${String.fromCharCode(65 + optIdx)}) ${opt}`;
+                    btn.onclick = function() {
+                        selectAnswer(idx, optIdx, btn);
+                    };
+                    optionsDiv.appendChild(btn);
+                });
+                
+                questionDiv.appendChild(optionsDiv);
+                container.appendChild(questionDiv);
+            });
+            
+            const submitBtn = document.createElement('button');
+            submitBtn.id = 'submit-quiz-btn';
+            submitBtn.textContent = 'Submit Quiz';
+            submitBtn.onclick = submitQuiz;
+            container.appendChild(submitBtn);
+            
+            modal.classList.add('show');
+            startQuizTimer();
+        }
+
+        function selectAnswer(questionIdx, optionIdx, element) {
+            const siblings = element.parentElement.querySelectorAll('.option-btn');
+            siblings.forEach(btn => btn.classList.remove('selected'));
+            
+            element.classList.add('selected');
+            selectedAnswers[questionIdx] = optionIdx;
+        }
+
+        function startQuizTimer() {
+            let remaining = quizDuration;
+            const timerEl = document.getElementById('quiz-timer');
+            
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                remaining--;
+                timerEl.textContent = remaining + 's';
+                
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    submitQuiz();
+                }
+            }, 1000);
+        }
+
+        function submitQuiz() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Connection lost. Cannot submit quiz.');
+                return;
+            }
+            
+            clearInterval(timerInterval);
+            
+            const answers = [];
+            for (let i = 0; i < quizData.questions.length; i++) {
+                answers.push(selectedAnswers[i] !== undefined ? selectedAnswers[i] : -1);
+            }
+            
+            const submissionTime = quizDuration - parseInt(document.getElementById('quiz-timer').textContent);
+            
+            ws.send(JSON.stringify({
+                type: 'quiz_answer',
+                quiz_id: quizData.quiz_id,
+                answers: answers,
+                submission_time: submissionTime
+            }));
+            
+            const submitBtn = document.getElementById('submit-quiz-btn');
+            if (submitBtn) submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitted! Waiting for partner...';
+        }
+
+        function displayResults(results) {
+            const modal = document.getElementById('quiz-modal');
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = '';
+            
+            const resultsDiv = document.createElement('div');
+            resultsDiv.className = 'results-container';
+            
+            const user1FinalScore = results.user1_final_score || results.user1_score;
+            const user2FinalScore = results.user2_final_score || results.user2_score;
+            
+            let message = '';
+            let winnerEmoji = '🎉';
+            
+            if (user1FinalScore > user2FinalScore) {
+                message = `${winnerEmoji} <b>${results.user1_name}</b> wins!`;
+            } else if (user2FinalScore > user1FinalScore) {
+                message = `${winnerEmoji} <b>${results.user2_name}</b> wins!`;
+            } else {
+                message = '🤝 It\'s a tie!';
+                winnerEmoji = '🤝';
+            }
+            
+            const time1 = results.submission_times.user1 || 0;
+            const time2 = results.submission_times.user2 || 0;
+            
+            resultsDiv.innerHTML = `
+                <div style="padding-bottom: 20px; border-bottom: 2px solid #e5e7eb;">
+                    <div class="results-message">${message}</div>
+                </div>
+                <div class="results-details">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">${results.user1_name}</div>
+                        <div style="font-size: 28px; color: #667eea; font-weight: 700;">${Math.round(user1FinalScore)}%</div>
+                        <div style="font-size: 14px; color: #6b7280; margin-top: 8px;">Accuracy: ${results.user1_score}% • Time: ${time1}s</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">${results.user2_name}</div>
+                        <div style="font-size: 28px; color: #667eea; font-weight: 700;">${Math.round(user2FinalScore)}%</div>
+                        <div style="font-size: 14px; color: #6b7280; margin-top: 8px;">Accuracy: ${results.user2_score}% • Time: ${time2}s</div>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: #9ca3af; margin-top: 25px;">This window will close automatically...</p>
+            `;
+            
+            container.appendChild(resultsDiv);
+            
+            setTimeout(() => {
+                closeQuizModal();
+                const chatBox = document.getElementById('chat-box');
+                chatBox.innerHTML += `<p class="message" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-left-color: #10b981;"><b style="color: #065f46;">📊 Quiz Results:</b><br>${results.user1_name}: ${Math.round(user1FinalScore)}% (${time1}s) | ${results.user2_name}: ${Math.round(user2FinalScore)}% (${time2}s)<br><b style="color: #065f46;">Winner: ${results.winner}</b></p>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 4000);
+        }
+
+        function closeQuizModal() {
+            const modal = document.getElementById('quiz-modal');
+            modal.classList.remove('show');
+            quizData = null;
+            selectedAnswers = {};
+            if (timerInterval) clearInterval(timerInterval);
+        }
+
+        function sendMessage() {
+            var messageInput = document.getElementById("message-input").value.trim();
+            if (messageInput) {
+                ws.send(JSON.stringify({"message": messageInput, "username": "User"}));
+                document.getElementById("message-input").value = "";
+            }
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle("dark-mode");
+            localStorage.setItem("dark-mode", document.body.classList.contains("dark-mode"));
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            if (localStorage.getItem("dark-mode") === "true") {
+                document.body.classList.add("dark-mode");
+            }
+        });
+        
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && document.getElementById("message-input") === document.activeElement) {
+                sendMessage();
+            }
+        });
+    </script>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1 class="header-title">🎯 Competitive Quiz Room #{{ problem_id }}</h1>
+            <div id="online-users">
+                <span class="online-indicator"></span>
+                <span class="count">0</span> competitors
+            </div>
+        </div>
+        <button class="toggle-btn" onclick="toggleDarkMode()">🌙</button>
+    </header>
+
+    <main>
+        <div id="chat-box"></div>
+        <div class="input-container">
+            <input type="text" id="message-input" placeholder="Chat with your competitor...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </main>
+    
+    <div id="quiz-modal">
+        <div class="quiz-container" id="quiz-container"></div>
+    </div>
+</body>
+</html>
