@@ -198,13 +198,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if self.problem_id not in waiting_users:
                 waiting_users[self.problem_id] = []
             
-            # Get LeetCode link and send as first message
-            problem_link = get_leetcode_link(self.problem_id)
-            await self.send(json.dumps({
-                "message": f"Problem Link: {problem_link}",
-                "username": "System"
-            }))
-
             await self.broadcast_user_count()
 
             # Try to find a partner
