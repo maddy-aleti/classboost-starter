@@ -108,19 +108,41 @@
     }
 
     function submitTopicAndExecute() {
+      console.log(
+        "[ContentScript] submitTopicAndExecute called, pendingAction:",
+        pendingAction
+      );
       const input = document.getElementById("cb-topic-input");
       const topic = input ? input.value.trim() : "";
+      console.log("[ContentScript] Topic entered:", topic);
       if (!topic) {
         showTempMessage("Please enter a topic");
         return;
       }
+      // Save action BEFORE hiding modal (hideTopicModal sets pendingAction to null)
+      const action = pendingAction;
+      console.log("[ContentScript] Saved action:", action);
+      console.log("[ContentScript] Calling hideTopicModal...");
       hideTopicModal();
-      if (pendingAction === "matchQuiz") {
+      console.log(
+        "[ContentScript] After hideTopicModal, pendingAction:",
+        pendingAction
+      );
+      if (action === "matchQuiz") {
+        console.log(
+          "[ContentScript] Matched matchQuiz, calling executeMatchQuiz..."
+        );
         executeMatchQuiz(topic);
-      } else if (pendingAction === "genGif") {
+      } else if (action === "genGif") {
+        console.log("[ContentScript] Matched genGif, calling executeGenGif...");
         executeGenGif(topic);
-      } else if (pendingAction === "genFlash") {
+      } else if (action === "genFlash") {
+        console.log(
+          "[ContentScript] Matched genFlash, calling executeGenFlashcard..."
+        );
         executeGenFlashcard(topic);
+      } else {
+        console.warn("[ContentScript] No matching action for action:", action);
       }
     }
 
@@ -163,25 +185,125 @@
     }
 
     function executeGenGif(topic) {
-      showTempMessage("Generating educational GIF...");
+      console.log("[ContentScript] executeGenGif called with topic:", topic);
+      showTempMessage("🎬 Generating GIF for: " + topic);
       try {
-        if (chrome && chrome.runtime && chrome.runtime.sendMessage)
-          chrome.runtime.sendMessage({
-            type: "generateGif",
-            payload: { topic },
-          });
-      } catch (e) {}
+        if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+          console.log(
+            "[ContentScript] Sending generateGif message to background..."
+          );
+          chrome.runtime.sendMessage(
+            {
+              type: "generateGif",
+              payload: { topic },
+            },
+            (response) => {
+              // Suppress "Extension context invalidated" - it's expected when extension reloads
+              if (chrome.runtime && chrome.runtime.lastError) {
+                const errMsg = chrome.runtime.lastError.message || "";
+                if (errMsg.includes("context invalidated")) {
+                  console.warn(
+                    "[ContentScript] Extension context invalidated (expected during reload)"
+                  );
+                } else {
+                  console.error("[ContentScript] Background error:", errMsg);
+                  showTempMessage("❌ Error: " + errMsg);
+                }
+                return;
+              }
+              console.log(
+                "[ContentScript] Got response from background:",
+                response
+              );
+              if (response && response.ok) {
+                console.log("[ContentScript] GIF URL:", response.gifUrl);
+                showTempMessage("✅ GIF found! Check your Meet chat.");
+              } else if (response && response.error) {
+                console.warn("[ContentScript] GIF error:", response.error);
+                showTempMessage("❌ GIF not found: " + response.error);
+              }
+            }
+          );
+        } else {
+          console.error(
+            "[ContentScript] chrome.runtime.sendMessage not available"
+          );
+        }
+      } catch (e) {
+        // Suppress "Extension context invalidated" in catch block too
+        if (e && e.message && e.message.includes("context invalidated")) {
+          console.warn(
+            "[ContentScript] Extension context invalidated (expected during reload)"
+          );
+        } else {
+          console.error("[ContentScript] executeGenGif error:", e);
+          showTempMessage("❌ Error: " + (e.message || "Unknown error"));
+        }
+      }
     }
 
     function executeGenFlashcard(topic) {
-      showTempMessage("Generating flashcard...");
+      console.log(
+        "[ContentScript] executeGenFlashcard called with topic:",
+        topic
+      );
+      showTempMessage("📇 Generating flashcard for: " + topic);
       try {
-        if (chrome && chrome.runtime && chrome.runtime.sendMessage)
-          chrome.runtime.sendMessage({
-            type: "generateFlashcard",
-            payload: { topic },
-          });
-      } catch (e) {}
+        if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+          console.log(
+            "[ContentScript] Sending generateFlashcard message to background..."
+          );
+          chrome.runtime.sendMessage(
+            {
+              type: "generateFlashcard",
+              payload: { topic },
+            },
+            (response) => {
+              // Suppress "Extension context invalidated" - it's expected when extension reloads
+              if (chrome.runtime && chrome.runtime.lastError) {
+                const errMsg = chrome.runtime.lastError.message || "";
+                if (errMsg.includes("context invalidated")) {
+                  console.warn(
+                    "[ContentScript] Extension context invalidated (expected during reload)"
+                  );
+                } else {
+                  console.error("[ContentScript] Background error:", errMsg);
+                  showTempMessage("❌ Error: " + errMsg);
+                }
+                return;
+              }
+              console.log(
+                "[ContentScript] Got response from background:",
+                response
+              );
+              if (response && response.ok) {
+                console.log("[ContentScript] Flashcard:", response.flashcard);
+                showTempMessage("✅ Flashcard created! Check your Meet chat.");
+              } else if (response && response.error) {
+                console.warn(
+                  "[ContentScript] Flashcard error:",
+                  response.error
+                );
+                showTempMessage("❌ Flashcard error: " + response.error);
+              }
+            }
+          );
+        } else {
+          console.error(
+            "[ContentScript] chrome.runtime.sendMessage not available"
+          );
+        }
+      } catch (e) {
+        // Suppress "Extension context invalidated" in catch block too
+        if (e && e.message && e.message.includes("context invalidated")) {
+          console.warn(
+            "[ContentScript] Extension context invalidated (expected during reload)"
+          );
+        } else {
+          console.error("[ContentScript] executeGenFlashcard error:", e);
+          showTempMessage("❌ Error: " + (e.message || "Unknown error"));
+        }
+      }
     }
 
     // Extract participant names from Google Meet
@@ -488,11 +610,17 @@
         chrome.runtime.sendMessage({ type: "getClassScore" }, (resp) => {
           try {
             if (chrome.runtime && chrome.runtime.lastError) {
-              // background may be unreachable (extension reloaded/unloaded)
-              console.warn(
-                "getClassScore sendMessage error",
-                chrome.runtime.lastError && chrome.runtime.lastError.message
-              );
+              // Suppress "Extension context invalidated" warnings - they're expected during reloads
+              if (
+                !chrome.runtime.lastError.message.includes(
+                  "context invalidated"
+                )
+              ) {
+                console.warn(
+                  "getClassScore sendMessage error",
+                  chrome.runtime.lastError && chrome.runtime.lastError.message
+                );
+              }
               return;
             }
             if (!resp) return;
@@ -505,34 +633,48 @@
                     () => {
                       if (chrome.runtime && chrome.runtime.lastError) {
                         // harmless, but log for debugging
-                        console.warn(
-                          "engagementUpdate sendMessage error",
-                          chrome.runtime.lastError &&
-                            chrome.runtime.lastError.message
-                        );
+                        if (
+                          !chrome.runtime.lastError.message.includes(
+                            "context invalidated"
+                          )
+                        ) {
+                          console.warn(
+                            "engagementUpdate sendMessage error",
+                            chrome.runtime.lastError &&
+                              chrome.runtime.lastError.message
+                          );
+                        }
                       }
                     }
                   );
                 }
               } catch (e) {
-                console.warn(
-                  "engagementUpdate sendMessage exception",
-                  e && e.message
-                );
+                // Suppress context invalidated errors during extension reload
+                if (!e.message?.includes("context invalidated")) {
+                  console.warn(
+                    "engagementUpdate sendMessage exception",
+                    e && e.message
+                  );
+                }
               }
             } else {
-              console.warn("getClassScore failed", resp && resp.error);
+              // Only log actual errors, not context invalidated
+              if (resp?.error && !resp.error.includes("context invalidated")) {
+                console.warn("getClassScore failed", resp && resp.error);
+              }
             }
           } catch (inner) {
             console.error("callback error for getClassScore", inner);
           }
         });
       } catch (e) {
-        // synchronous errors such as "Extension context invalidated"
-        console.warn(
-          "getClassScore sendMessage failed (caught)",
-          e && e.message
-        );
+        // Suppress "Extension context invalidated" warnings - they're expected
+        if (e && e.message && !e.message.includes("context invalidated")) {
+          console.warn(
+            "getClassScore sendMessage failed (caught)",
+            e && e.message
+          );
+        }
       }
     }, 5000);
   }
@@ -685,7 +827,10 @@
         );
       }
     } catch (e) {
-      console.warn("engagementSnapshot sendMessage failed", e && e.message);
+      // Suppress "Extension context invalidated" warnings - they're expected during extension reloads
+      if (e && e.message && !e.message.includes("context invalidated")) {
+        console.warn("engagementSnapshot sendMessage failed", e && e.message);
+      }
     }
 
     // reset counters
@@ -695,6 +840,98 @@
 
   setInterval(computeSnapshot, INTERVAL);
 })();
+
+// Display GIF or Flashcard in a modal - GLOBAL SCOPE
+function displayMediaModal(type, title, content) {
+  try {
+    // Create backdrop overlay
+    const backdrop = document.createElement("div");
+    backdrop.style.position = "fixed";
+    backdrop.style.top = "0";
+    backdrop.style.left = "0";
+    backdrop.style.width = "100%";
+    backdrop.style.height = "100%";
+    backdrop.style.background = "rgba(0,0,0,0.6)";
+    backdrop.style.zIndex = "2147483640";
+    backdrop.style.display = "flex";
+    backdrop.style.alignItems = "center";
+    backdrop.style.justifyContent = "center";
+
+    // Create modal container
+    const modal = document.createElement("div");
+    modal.style.position = "relative";
+    modal.style.background = "white";
+    modal.style.borderRadius = "12px";
+    modal.style.padding = "24px";
+    modal.style.maxWidth = "90vw";
+    modal.style.maxHeight = "90vh";
+    modal.style.overflow = "auto";
+    modal.style.boxShadow = "0 8px 32px rgba(0,0,0,0.3)";
+
+    // Add title
+    const titleEl = document.createElement("h2");
+    titleEl.textContent = title;
+    titleEl.style.margin = "0 0 16px 0";
+    titleEl.style.color = "#333";
+    titleEl.style.fontSize = "20px";
+    titleEl.style.fontWeight = "600";
+    modal.appendChild(titleEl);
+
+    // Add content
+    if (type === "gif") {
+      const img = document.createElement("img");
+      img.src = content;
+      img.style.maxWidth = "100%";
+      img.style.maxHeight = "60vh";
+      img.style.borderRadius = "8px";
+      img.style.display = "block";
+      img.style.margin = "16px 0";
+      modal.appendChild(img);
+    } else if (type === "flashcard") {
+      const cardDiv = document.createElement("div");
+      cardDiv.style.background = "#f8f9fa";
+      cardDiv.style.padding = "20px";
+      cardDiv.style.borderRadius = "8px";
+      cardDiv.style.marginBottom = "16px";
+      cardDiv.style.minHeight = "150px";
+      cardDiv.style.display = "flex";
+      cardDiv.style.alignItems = "center";
+      cardDiv.style.justifyContent = "center";
+      cardDiv.style.textAlign = "center";
+      cardDiv.innerHTML = content;
+      cardDiv.style.fontSize = "16px";
+      cardDiv.style.lineHeight = "1.6";
+      cardDiv.style.color = "#333";
+      modal.appendChild(cardDiv);
+    }
+
+    // Add close button
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "✕ Close";
+    closeBtn.style.marginTop = "16px";
+    closeBtn.style.padding = "10px 20px";
+    closeBtn.style.background = "#dc3545";
+    closeBtn.style.color = "white";
+    closeBtn.style.border = "none";
+    closeBtn.style.borderRadius = "6px";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.fontSize = "14px";
+    closeBtn.style.fontWeight = "500";
+    closeBtn.style.width = "100%";
+    closeBtn.style.transition = "background 0.2s";
+    closeBtn.onmouseover = () => (closeBtn.style.background = "#c82333");
+    closeBtn.onmouseout = () => (closeBtn.style.background = "#dc3545");
+    closeBtn.onclick = () => {
+      backdrop.remove();
+    };
+    modal.appendChild(closeBtn);
+
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+  } catch (e) {
+    console.error("[ContentScript] Error displaying media modal:", e);
+  }
+}
 
 if (
   window.chrome &&
@@ -730,6 +967,124 @@ if (
             showCompetitiveSummary(msg.payload);
           } catch (e) {}
         }
+        // GIF generation result
+        if (msg.type === "gifResult" && msg.payload) {
+          try {
+            console.log("[ContentScript] GIF result received:", msg.payload);
+            if (msg.payload.gifUrl) {
+              console.log(
+                "[ContentScript] GIF URL available:",
+                msg.payload.gifUrl
+              );
+              // Display GIF in modal
+              displayMediaModal(
+                "gif",
+                "🎬 GIF: " + msg.payload.topic,
+                msg.payload.gifUrl
+              );
+            } else if (msg.payload.error) {
+              console.warn("[ContentScript] GIF error:", msg.payload.error);
+              try {
+                showTempMessage("❌ GIF error: " + msg.payload.error);
+              } catch (e) {
+                console.warn(
+                  "[ContentScript] Could not show temp message:",
+                  e.message
+                );
+              }
+            } else {
+              console.warn(
+                "[ContentScript] No GIF URL in response",
+                msg.payload
+              );
+              try {
+                showTempMessage("❌ No GIF found for: " + msg.payload.topic);
+              } catch (e) {
+                console.warn(
+                  "[ContentScript] Could not show temp message:",
+                  e.message
+                );
+              }
+            }
+          } catch (e) {
+            console.error("[ContentScript] Error processing GIF result:", e);
+          }
+        }
+        // Flashcard generation result
+        if (msg.type === "flashcardResult" && msg.payload) {
+          try {
+            console.log(
+              "[ContentScript] Flashcard result received:",
+              msg.payload
+            );
+            if (msg.payload.flashcard) {
+              console.log(
+                "[ContentScript] Flashcard available:",
+                msg.payload.flashcard
+              );
+              // Convert flashcard to HTML and display in modal
+              let cardHTML = "";
+              const flashcard = msg.payload.flashcard;
+              if (typeof flashcard === "string") {
+                cardHTML = flashcard;
+              } else if (typeof flashcard === "object") {
+                cardHTML = `
+                  <div>
+                    <div style="margin-bottom: 12px;"><strong>Q: ${
+                      flashcard.question || flashcard.front || ""
+                    }</strong></div>
+                    <div style="margin-bottom: 12px;"><strong>A: ${
+                      flashcard.answer || flashcard.back || ""
+                    }</strong></div>
+                    ${
+                      flashcard.explanation
+                        ? `<div style="font-style: italic; font-size: 14px; color: #555;">${flashcard.explanation}</div>`
+                        : ""
+                    }
+                  </div>
+                `;
+              }
+              displayMediaModal(
+                "flashcard",
+                "📇 Flashcard: " + msg.payload.topic,
+                cardHTML
+              );
+            } else if (msg.payload.error) {
+              console.warn(
+                "[ContentScript] Flashcard error:",
+                msg.payload.error
+              );
+              try {
+                showTempMessage("❌ Flashcard error: " + msg.payload.error);
+              } catch (e) {
+                console.warn(
+                  "[ContentScript] Could not show temp message:",
+                  e.message
+                );
+              }
+            } else {
+              console.warn(
+                "[ContentScript] No flashcard in response",
+                msg.payload
+              );
+              try {
+                showTempMessage(
+                  "❌ Failed to create flashcard for: " + msg.payload.topic
+                );
+              } catch (e) {
+                console.warn(
+                  "[ContentScript] Could not show temp message:",
+                  e.message
+                );
+              }
+            }
+          } catch (e) {
+            console.error(
+              "[ContentScript] Error processing flashcard result:",
+              e
+            );
+          }
+        }
       } catch (e) {
         console.warn("onMessage handler error", e && e.message);
       }
@@ -741,6 +1096,8 @@ if (
 
 function updateGauge(val) {
   try {
+    if (typeof val !== "number" || val < 0 || val > 1) return;
+
     const percent = Math.round(val * 100);
     const label = val > 0.75 ? "Engaged" : val > 0.45 ? "Okay" : "Low";
 
@@ -782,19 +1139,25 @@ function hideAlertBanner() {
 }
 
 function setNeedlePercent(val) {
-  // val: 0..1
-  const degMin = -90; // left
-  const degMax = 90; // right
-  const deg = degMin + (degMax - degMin) * val;
-  const needle = document.getElementById("needle");
-  if (needle) {
-    needle.style.transform = `translate(0,0) rotate(${deg}deg)`;
+  try {
+    if (typeof val !== "number" || val < 0 || val > 1) return;
+
+    // val: 0..1
+    const degMin = -90; // left
+    const degMax = 90; // right
+    const deg = degMin + (degMax - degMin) * val;
+    const needle = document.getElementById("needle");
+    if (needle) {
+      needle.style.transform = `translate(0,0) rotate(${deg}deg)`;
+    }
+    const p = document.getElementById("spd-percent");
+    const lbl = document.getElementById("spd-label");
+    if (p) p.textContent = Math.round(val * 100) + "%";
+    if (lbl)
+      lbl.textContent = val > 0.75 ? "Engaged" : val > 0.45 ? "Okay" : "Low";
+  } catch (e) {
+    console.error("setNeedlePercent error", e);
   }
-  const p = document.getElementById("spd-percent");
-  const lbl = document.getElementById("spd-label");
-  if (p) p.textContent = Math.round(val * 100) + "%";
-  if (lbl)
-    lbl.textContent = val > 0.75 ? "Engaged" : val > 0.45 ? "Okay" : "Low";
 }
 
 function startTeacherPolling() {
@@ -942,34 +1305,269 @@ function submitQuizAnswer(quizId, selectedIndex) {
 function showQuizOutcome(payload) {
   // show a small toast informing student whether they won or were correct
   const yourCorrect = payload.yourCorrect;
-  const winner = payload.winner;
-  const quiz = payload.quiz;
   removeCompetitiveQuiz();
-  const msg = yourCorrect
-    ? winner
-      ? winner && winner === undefined
-        ? "Result"
-        : winner
-        ? ""
-        : ""
-      : ""
-    : "";
-  // simpler message
+
   const text = yourCorrect
-    ? payload.yourCorrect
-      ? "You answered correctly!"
-      : "You answered incorrectly."
-    : "Time up.";
+    ? "You answered correctly!"
+    : "You answered incorrectly.";
+
   showTempMessage(text, 4000);
 }
 
 function showCompetitiveSummary(payload) {
   // show teacher and others the summary briefly
-  const winner = payload.winner;
+  const winner = payload.winner || "Unknown";
   const results = payload.results || [];
-  if (!winner) {
-    showTempMessage("Competitive quiz finished: no winner", 4000);
-  } else {
-    showTempMessage("Competitive quiz finished. Winner tabId: " + winner, 5000);
+
+  const msg = winner
+    ? `🏆 Competitive quiz finished. Winner: ${winner}`
+    : "Competitive quiz finished: no winner";
+
+  try {
+    // Try to show via toast if available, otherwise log
+    if (typeof showTempMessage === "function") {
+      showTempMessage(msg, 5000);
+    } else {
+      console.log(msg);
+    }
+  } catch (e) {
+    console.log(msg);
   }
+}
+
+// ===== GIF Modal Display =====
+function removeGifModal() {
+  const ex = document.getElementById("cb-gif-modal");
+  if (ex)
+    try {
+      ex.remove();
+    } catch (e) {}
+}
+
+function showGifModal(payload) {
+  removeGifModal();
+  const { gifUrl, topic, error } = payload;
+
+  if (error) {
+    try {
+      showTempMessage("GIF not found for: " + topic, 4000);
+    } catch (e) {
+      console.error("[GIF Modal] Error showing temp message:", e);
+      alert("GIF not found for: " + topic);
+    }
+    return;
+  }
+
+  const modal = document.createElement("div");
+  modal.id = "cb-gif-modal";
+  modal.style.position = "fixed";
+  modal.style.inset = "0";
+  modal.style.display = "flex";
+  modal.style.alignItems = "center";
+  modal.style.justifyContent = "center";
+  modal.style.background = "rgba(0,0,0,0.7)";
+  modal.style.zIndex = "2147483651";
+
+  const card = document.createElement("div");
+  card.style.background = "#0f0f10";
+  card.style.color = "#f3e9d2";
+  card.style.padding = "20px";
+  card.style.borderRadius = "10px";
+  card.style.width = "500px";
+  card.style.maxWidth = "90vw";
+  card.style.textAlign = "center";
+  card.style.boxShadow = "0 10px 30px rgba(0,0,0,0.6)";
+
+  const title = document.createElement("h3");
+  title.textContent = "GIF: " + topic;
+  title.style.marginBottom = "12px";
+  title.style.color = "#f3e9d2";
+
+  const img = document.createElement("img");
+  img.src = gifUrl;
+  img.style.width = "100%";
+  img.style.borderRadius = "8px";
+  img.style.marginBottom = "12px";
+  img.style.maxHeight = "400px";
+  img.style.objectFit = "contain";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.textContent = "Close";
+  closeBtn.className = "cb-btn";
+  closeBtn.style.width = "100%";
+  closeBtn.addEventListener("click", removeGifModal);
+
+  card.appendChild(title);
+  card.appendChild(img);
+  card.appendChild(closeBtn);
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+
+  // Click outside modal to close
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) removeGifModal();
+  });
+}
+
+// ===== Flashcard Modal Display =====
+function removeFlashcardModal() {
+  const ex = document.getElementById("cb-flashcard-modal");
+  if (ex)
+    try {
+      ex.remove();
+    } catch (e) {}
+}
+
+function showFlashcardModal(payload) {
+  removeFlashcardModal();
+  const { flashcard, topic, error } = payload;
+
+  if (error || !flashcard) {
+    try {
+      showTempMessage(
+        "Flashcard generation failed: " + (error || "Unknown error"),
+        4000
+      );
+    } catch (e) {
+      console.error("[Flashcard Modal] Error showing temp message:", e);
+      // Fallback: display error message directly
+      const errMsg = document.createElement("div");
+      errMsg.style.position = "fixed";
+      errMsg.style.bottom = "22px";
+      errMsg.style.left = "50%";
+      errMsg.style.transform = "translateX(-50%)";
+      errMsg.style.background = "rgba(0,0,0,0.85)";
+      errMsg.style.color = "#f3e9d2";
+      errMsg.style.padding = "8px 12px";
+      errMsg.style.borderRadius = "8px";
+      errMsg.style.zIndex = "2147483650";
+      errMsg.textContent =
+        "Flashcard generation failed: " + (error || "Unknown error");
+      document.body.appendChild(errMsg);
+      setTimeout(() => {
+        try {
+          errMsg.remove();
+        } catch (e) {}
+      }, 4000);
+    }
+    return;
+  }
+
+  const modal = document.createElement("div");
+  modal.id = "cb-flashcard-modal";
+  modal.style.position = "fixed";
+  modal.style.inset = "0";
+  modal.style.display = "flex";
+  modal.style.alignItems = "center";
+  modal.style.justifyContent = "center";
+  modal.style.background = "rgba(0,0,0,0.7)";
+  modal.style.zIndex = "2147483651";
+
+  const card = document.createElement("div");
+  card.style.background = "#0f0f10";
+  card.style.color = "#f3e9d2";
+  card.style.padding = "30px";
+  card.style.borderRadius = "10px";
+  card.style.width = "500px";
+  card.style.maxWidth = "90vw";
+  card.style.textAlign = "center";
+  card.style.boxShadow = "0 10px 30px rgba(0,0,0,0.6)";
+
+  const title = document.createElement("h3");
+  title.textContent = "Flashcard: " + topic;
+  title.style.marginBottom = "20px";
+  title.style.color = "#f3e9d2";
+  title.style.fontSize = "18px";
+
+  const flashcardContainer = document.createElement("div");
+  flashcardContainer.style.perspective = "1000px";
+  flashcardContainer.style.minHeight = "200px";
+
+  const flashcardFace = document.createElement("div");
+  flashcardFace.id = "cb-flashcard-face";
+  flashcardFace.style.position = "relative";
+  flashcardFace.style.width = "100%";
+  flashcardFace.style.height = "200px";
+  flashcardFace.style.background =
+    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+  flashcardFace.style.borderRadius = "8px";
+  flashcardFace.style.display = "flex";
+  flashcardFace.style.alignItems = "center";
+  flashcardFace.style.justifyContent = "center";
+  flashcardFace.style.cursor = "pointer";
+  flashcardFace.style.padding = "20px";
+  flashcardFace.style.boxSizing = "border-box";
+  flashcardFace.style.transition = "all 0.3s ease";
+  flashcardFace.style.fontSize = "16px";
+  flashcardFace.style.fontWeight = "600";
+  flashcardFace.style.textAlign = "center";
+  flashcardFace.innerHTML = flashcard.front;
+
+  let isFlipped = false;
+  flashcardFace.addEventListener("click", () => {
+    isFlipped = !isFlipped;
+    if (isFlipped) {
+      flashcardFace.style.background =
+        "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)";
+      flashcardFace.innerHTML = flashcard.back;
+      flipBtn.textContent = "Show Question";
+    } else {
+      flashcardFace.style.background =
+        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+      flashcardFace.innerHTML = flashcard.front;
+      flipBtn.textContent = "Show Answer";
+    }
+  });
+
+  flashcardContainer.appendChild(flashcardFace);
+
+  const difficultyTag = document.createElement("div");
+  difficultyTag.style.marginTop = "15px";
+  difficultyTag.style.fontSize = "12px";
+  difficultyTag.style.padding = "5px 10px";
+  difficultyTag.style.background =
+    flashcard.difficulty === "easy"
+      ? "#2ecc71"
+      : flashcard.difficulty === "hard"
+      ? "#e74c3c"
+      : "#f39c12";
+  difficultyTag.style.color = "#0f0f10";
+  difficultyTag.style.borderRadius = "4px";
+  difficultyTag.style.display = "inline-block";
+  difficultyTag.style.fontWeight = "bold";
+  difficultyTag.textContent =
+    "Difficulty: " + (flashcard.difficulty || "medium").toUpperCase();
+
+  const buttonsDiv = document.createElement("div");
+  buttonsDiv.style.display = "flex";
+  buttonsDiv.style.gap = "8px";
+  buttonsDiv.style.justifyContent = "center";
+  buttonsDiv.style.marginTop = "20px";
+
+  const flipBtn = document.createElement("button");
+  flipBtn.textContent = "Show Answer";
+  flipBtn.className = "cb-btn";
+  flipBtn.style.flex = "1";
+  flipBtn.addEventListener("click", () => flashcardFace.click());
+
+  const closeBtn = document.createElement("button");
+  closeBtn.textContent = "Close";
+  closeBtn.className = "cb-btn";
+  closeBtn.style.flex = "1";
+  closeBtn.addEventListener("click", removeFlashcardModal);
+
+  buttonsDiv.appendChild(flipBtn);
+  buttonsDiv.appendChild(closeBtn);
+
+  card.appendChild(title);
+  card.appendChild(flashcardContainer);
+  card.appendChild(difficultyTag);
+  card.appendChild(buttonsDiv);
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+
+  // Click outside to close
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) removeFlashcardModal();
+  });
 }
